@@ -5,6 +5,9 @@ import { ConfigError } from "../../config/errors.js";
 import { loadConfig } from "../../config/load.js";
 import { resolveCliOverrides } from "../../config/resolve.js";
 import type { ResolvedConfig } from "../../config/types.js";
+import { allRules } from "../../engine/registry.js";
+// Importing registers the product rules so config validation knows their ids.
+import "../../rules/index.js";
 import { exitCodeFor } from "../../core/exit-code.js";
 import { buildReport } from "../../core/report.js";
 import { runScan } from "../../core/scan.js";
@@ -17,9 +20,7 @@ export interface ScanCommandOptions {
 	dumpConfig?: boolean;
 }
 
-// The rule registry is empty until F003 lands; rule-id validation still runs
-// against this set, so any rules entry currently fails loudly (spec 002).
-const REGISTERED_RULE_IDS = new Set<string>();
+const REGISTERED_RULE_IDS = new Set(allRules().map((rule) => rule.id));
 
 export async function scanCommand(
 	pathArg: string | undefined,

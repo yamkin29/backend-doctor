@@ -45,7 +45,17 @@ describe("AC-3: json report", () => {
 		expect(parsed.mode).toBe("full");
 		expect(parsed.directory).toBe(dir);
 		expect(parsed.diagnostics).toEqual([]);
-		expect(parsed.projects).toEqual([]);
+		// F003 fills projects[]; an empty directory yields one empty project.
+		expect(parsed.projects).toEqual([
+			{
+				packageRoot: dir,
+				frameworks: [],
+				analyzedFiles: [],
+				analyzedFileCount: 0,
+				complete: true,
+				skippedChecks: [],
+			},
+		]);
 	});
 });
 
