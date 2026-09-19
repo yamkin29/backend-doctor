@@ -1,6 +1,6 @@
 # Spec 002 — Config (F002)
 
-- **Status:** Draft — pending review
+- **Status:** Implemented
 - **Phase:** 0 — Foundation
 - **Depends on:** F001 (CLI skeleton) — Done
 - **Blocks:** F003 (engine core consumes the resolved config)
