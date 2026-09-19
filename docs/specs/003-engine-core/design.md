@@ -1,6 +1,6 @@
 # Design 003 — Engine core (F003)
 
-- **Status:** Draft — pending spec review
+- **Status:** Implemented (2026-09-19) — see deviations in [tasks.md](./tasks.md)
 - **Implements:** [spec.md](./spec.md)
 
 ## Module layout

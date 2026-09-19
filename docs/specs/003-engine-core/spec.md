@@ -1,6 +1,6 @@
 # Spec 003 — Engine core (F003)
 
-- **Status:** Draft — pending review
+- **Status:** Implemented (2026-09-19)
 - **Phase:** 0 — Foundation
 - **Depends on:** F001 (CLI), F002 (Config) — both Done
 - **Blocks:** F004 (framework detection), F005+ (rule packs)
@@ -151,3 +151,12 @@ fixtures, snapshot tests and `docs/rules/<id>.md` (constitution §3).
 4. **`analyzedFiles` in the JSON report** — full relative list (may be large on big
    repos). Recommended for MVP; can cap or move behind a flag later.
 5. **New dependency:** `ts-morph` (latest major; pinned after install).
+
+## Resolution (recorded at implementation, 2026-09-19)
+
+All recommended options were adopted: (1) seed rules shipped; (2) §4 enforced as a
+module boundary — only `src/engine/parser/ts-morph-adapter.ts` imports ts-morph at
+runtime, `parser/types.ts` is the sole re-export surface (no constitution text
+change); (3) no tsconfig in file selection; (4) `analyzedFiles` uncapped; (5)
+`ts-morph@28` pinned. Implementation deviations from the design sketch are listed
+in [tasks.md](./tasks.md).
