@@ -344,3 +344,83 @@ describe("runScan async rules (AC-17, spec 005)", () => {
 		}
 	});
 });
+
+describe("runScan blocking rules (AC-10, spec 006)", () => {
+	function writeBlockingProject(): string {
+		const tmp = fs.mkdtempSync(
+			path.join(os.tmpdir(), "backend-doctor-blocking-"),
+		);
+		const src = path.join(tmp, "src");
+		fs.mkdirSync(src, { recursive: true });
+		fs.writeFileSync(
+			path.join(src, "worker.ts"),
+			[
+				'import fs from "node:fs";',
+				'import { pbkdf2Sync } from "node:crypto";',
+				"",
+				"export function load(path: string): string {",
+				'\treturn fs.readFileSync(path, "utf8");',
+				"}",
+				"",
+				"export function derive(password: string, salt: string): Buffer {",
+				'\treturn pbkdf2Sync(password, salt, 100_000, 32, "sha256");',
+				"}",
+				"",
+				"export function spin(): number {",
+				"\tlet total = 0;",
+				"\tfor (let i = 0; i < 100_000; i++) {",
+				"\t\ttotal += i;",
+				"\t}",
+				"\treturn total;",
+				"}",
+			].join("\n"),
+		);
+		return tmp;
+	}
+
+	it("reports the three blocking violations in report order at warn severity", async () => {
+		const tmp = writeBlockingProject();
+		try {
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(
+				result.diagnostics.map((d) => [d.line, d.column, d.rule, d.severity]),
+			).toEqual([
+				[5, 9, "backend-doctor/no-sync-fs-in-request-path", "warn"],
+				[9, 9, "backend-doctor/no-sync-crypto", "warn"],
+				[14, 2, "backend-doctor/no-cpu-bound-loop", "warn"],
+			]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("escalates one blocking rule to error without touching the others", async () => {
+		const tmp = writeBlockingProject();
+		try {
+			const config = defaultConfig();
+			config.rules["backend-doctor/no-sync-fs-in-request-path"] = "error";
+
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config,
+			});
+
+			const byRule = Object.fromEntries(
+				result.diagnostics.map((d) => [d.rule, d.severity]),
+			);
+			expect(byRule).toEqual({
+				"backend-doctor/no-sync-fs-in-request-path": "error",
+				"backend-doctor/no-sync-crypto": "warn",
+				"backend-doctor/no-cpu-bound-loop": "warn",
+			});
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+});
