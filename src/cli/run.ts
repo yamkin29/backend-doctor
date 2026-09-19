@@ -1,4 +1,5 @@
-import { Command, CommanderError } from "commander";
+import process from "node:process";
+import { Command, CommanderError, Option } from "commander";
 import type { ReportFormat } from "../reporters/index.js";
 import { type ScanCommandOptions, scanCommand } from "./commands/scan.js";
 import { resolveVersion } from "./version.js";
@@ -29,18 +30,29 @@ export async function run(argv: string[]): Promise<number> {
 		.command("scan")
 		.description("Scan a project for issues.")
 		.argument("[path]", "directory or file to scan (default: cwd)")
-		.option("--format <format>", "output format: pretty|json|jsonl", "pretty")
+		.addOption(
+			new Option("--format <format>", "output format: pretty|json|jsonl")
+				.choices(["pretty", "json", "jsonl"])
+				.default("pretty"),
+		)
 		.option(
 			"--ignore <glob>",
 			"exclude glob; repeatable; no-op until the engine lands (F003)",
 			collectIgnore,
 			[],
 		)
+		.option("--config <path>", "reserved; config files are supported from F002")
 		.exitOverride()
 		.action(async (pathArg: string | undefined, opts: ScanCommandOptions) => {
+			if (opts.config !== undefined) {
+				process.stderr.write(
+					"The --config option is reserved: config files are supported from F002.\n",
+				);
+				exit = 2;
+				return;
+			}
 			exit = await scanCommand(pathArg, {
 				...opts,
-				// Choice validation lands with AC-8 (T6); cast until then.
 				format: opts.format as ReportFormat,
 			});
 		});

@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
 	expectSuccess,
@@ -53,5 +55,46 @@ describe("AC-4: jsonl empty scan", () => {
 		const result = runCli(["scan", dir, "--format", "jsonl"]);
 		expectSuccess(result);
 		expect(result.stdout).toBe("");
+	});
+});
+
+describe("AC-5: unknown option", () => {
+	it("prints usage to stderr and exits 2", () => {
+		const result = runCli(["scan", makeTmpDir(), "--bogus"]);
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).not.toBe("");
+	});
+});
+
+describe("AC-6: --config is reserved", () => {
+	it("exits 2 and points to F002", () => {
+		const result = runCli([
+			"scan",
+			makeTmpDir(),
+			"--config",
+			"backend-doctor.config.ts",
+		]);
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain("F002");
+	});
+});
+
+describe("AC-7: nonexistent path", () => {
+	it("exits 2 with a message naming the path", () => {
+		const missing = path.join(
+			os.tmpdir(),
+			`backend-doctor-missing-${process.pid}-${Date.now()}`,
+		);
+		const result = runCli(["scan", missing]);
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain(missing);
+	});
+});
+
+describe("AC-8: invalid --format value", () => {
+	it("exits 2 for an unsupported format", () => {
+		const result = runCli(["scan", makeTmpDir(), "--format", "xml"]);
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).not.toBe("");
 	});
 });
