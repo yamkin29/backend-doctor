@@ -10,6 +10,7 @@ import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapte
 import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { noAsyncConstructorWork } from "../../../src/rules/async/no-async-constructor-work.js";
+import { noAsyncForeachCallback } from "../../../src/rules/async/no-async-foreach-callback.js";
 import { noFloatingPromises } from "../../../src/rules/async/no-floating-promises.js";
 
 const FIXTURE_ROOT = path.resolve(
@@ -21,6 +22,7 @@ const FIXTURE_ROOT = path.resolve(
 const rules: Record<string, RuleDefinition> = {
 	"no-floating-promises": noFloatingPromises,
 	"no-async-constructor-work": noAsyncConstructorWork,
+	"no-async-foreach-callback": noAsyncForeachCallback,
 };
 
 /** Runs one rule over a fixture directory using the real parser adapter. */
@@ -173,6 +175,56 @@ describe("backend-doctor/no-async-constructor-work (AC-11..12)", () => {
 			scanFixture(
 				"no-async-constructor-work",
 				"no-async-constructor-work/valid",
+			),
+		).toEqual([]);
+	});
+});
+
+describe("backend-doctor/no-async-foreach-callback (AC-7..8)", () => {
+	const message =
+		"Array.forEach does not await async callbacks, so iteration order is lost and rejections go unhandled. Use for…of with await or Promise.all(items.map(...)).";
+
+	it("flags forEach with an inline async callback (AC-7)", () => {
+		expect(
+			summarize(
+				scanFixture(
+					"no-async-foreach-callback",
+					"no-async-foreach-callback/invalid",
+				),
+			),
+		).toEqual([
+			{
+				file: path.join(
+					"no-async-foreach-callback",
+					"invalid",
+					"async-arrow.ts",
+				),
+				line: 5,
+				column: 1,
+				message,
+				severity: "warn",
+				category: "Bugs",
+			},
+			{
+				file: path.join(
+					"no-async-foreach-callback",
+					"invalid",
+					"async-function.ts",
+				),
+				line: 2,
+				column: 1,
+				message,
+				severity: "warn",
+				category: "Bugs",
+			},
+		]);
+	});
+
+	it("stays silent on sync callbacks, map+Promise.all and for-of-await (AC-8)", () => {
+		expect(
+			scanFixture(
+				"no-async-foreach-callback",
+				"no-async-foreach-callback/valid",
 			),
 		).toEqual([]);
 	});
