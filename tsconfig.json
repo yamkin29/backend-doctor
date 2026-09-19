@@ -6,6 +6,7 @@
 		"lib": ["ES2023"],
 		"types": ["node"],
 		"strict": true,
+		"esModuleInterop": true,
 		"noUncheckedIndexedAccess": true,
 		"verbatimModuleSyntax": true,
 		"noEmit": true,

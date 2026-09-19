@@ -1,5 +1,11 @@
 import { Command, CommanderError } from "commander";
+import type { ReportFormat } from "../reporters/index.js";
+import { type ScanCommandOptions, scanCommand } from "./commands/scan.js";
 import { resolveVersion } from "./version.js";
+
+function collectIgnore(value: string, previous: string[]): string[] {
+	return [...previous, value];
+}
 
 /**
  * Parses argv and dispatches to a command. Side-effect free except for stdout
@@ -18,6 +24,27 @@ export async function run(argv: string[]): Promise<number> {
 		.version(resolveVersion(), "-V, --version")
 		.exitOverride();
 
+	let exit = 0;
+	program
+		.command("scan")
+		.description("Scan a project for issues.")
+		.argument("[path]", "directory or file to scan (default: cwd)")
+		.option("--format <format>", "output format: pretty|json|jsonl", "pretty")
+		.option(
+			"--ignore <glob>",
+			"exclude glob; repeatable; no-op until the engine lands (F003)",
+			collectIgnore,
+			[],
+		)
+		.exitOverride()
+		.action(async (pathArg: string | undefined, opts: ScanCommandOptions) => {
+			exit = await scanCommand(pathArg, {
+				...opts,
+				// Choice validation lands with AC-8 (T6); cast until then.
+				format: opts.format as ReportFormat,
+			});
+		});
+
 	try {
 		await program.parseAsync(argv);
 	} catch (error) {
@@ -35,5 +62,5 @@ export async function run(argv: string[]): Promise<number> {
 		}
 		throw error;
 	}
-	return 0;
+	return exit;
 }
