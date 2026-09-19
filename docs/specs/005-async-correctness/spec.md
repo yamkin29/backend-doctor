@@ -1,6 +1,6 @@
 # Spec 005 — Async-correctness rules (F005)
 
-- **Status:** Approved (2026-09-19)
+- **Status:** Implemented (2026-09-19)
 - **Phase:** 1 — Node core rules
 - **Depends on:** F003 (Engine core) — Done; F004 (Framework detection) — Done
   (the pack gate exists; none of these rules declare frameworks)

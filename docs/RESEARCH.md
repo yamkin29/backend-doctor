@@ -48,6 +48,23 @@ Under interop, a module **without** a default export exposes a *virtual*
 - Dynamic `import("…")` is a CallExpression whose expression has kind
   `SyntaxKind.ImportKeyword` — collect its first StringLiteral argument for
   module specifiers (see `getModuleSpecifiers()` in `ts-morph-adapter.ts`).
+- **`forEachDescendant` callback return value is traversal control.** The
+  callback must return `"skip"` or `undefined` — returning any other truthy
+  value (e.g. `nodes.push(n)`'s number) silently aborts the traversal. Bit
+  spec 005 T1 while probing; rules keep the explicit `return undefined;`
+  pattern (`no-eval` precedent).
+- **`Node.isParameter` does not exist** (v28); the missing guard surfaces as
+  a runtime crash inside a rule — which the runner converts into an
+  `internal` diagnostic + `skippedChecks` entry (constitution §8, verified
+  live in spec 005 T6). Use `node.asKind(SyntaxKind.Parameter)` instead: it
+  both guards and narrows.
+- **`TryStatement.getCatchClause()`** exists and returns `undefined` for a
+  finally-only try — the right predicate for "guarded by try/catch"
+  (`unhandled-json-parse`, spec 005).
+- **`void f()` / `await f()` are structurally not statement-level
+  CallExpressions** (ExpressionStatement wraps VoidExpression /
+  AwaitExpression), so a "statement-level call" check suppresses them for
+  free — no special cases needed (spec 005 design decision 3).
 
 ### pnpm 12
 
