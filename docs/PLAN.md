@@ -62,7 +62,7 @@ projects[] }`.
 
 | ID | Feature | Phase | Status |
 |----|---------|-------|--------|
-| F001 | CLI skeleton & DX | 0 | Spec in review |
+| F001 | CLI skeleton & DX | 0 | Done |
 | F002 | Config (defineConfig, walk-up, overrides) | 0 | Planned |
 | F003 | Engine core (ParserAdapter, RuleRegistry, RuleRunner, reporters) | 0 | Planned |
 | F004 | Framework detection (nest/express/fastify/prisma) | 0 | Planned |

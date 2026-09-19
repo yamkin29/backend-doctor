@@ -1,6 +1,6 @@
 # Spec 001 — CLI skeleton & DX (F001)
 
-- **Status:** Draft — pending review
+- **Status:** Implemented
 - **Phase:** 0 — Foundation
 - **Depends on:** nothing (first feature)
 - **Blocks:** F002 (config), F003 (engine core)
