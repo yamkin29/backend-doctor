@@ -9,6 +9,7 @@ import {
 import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapter.js";
 import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
+import { noAsyncConstructorWork } from "../../../src/rules/async/no-async-constructor-work.js";
 import { noFloatingPromises } from "../../../src/rules/async/no-floating-promises.js";
 
 const FIXTURE_ROOT = path.resolve(
@@ -19,6 +20,7 @@ const FIXTURE_ROOT = path.resolve(
 /** Short fixture id → rule under test (grows with each rule task). */
 const rules: Record<string, RuleDefinition> = {
 	"no-floating-promises": noFloatingPromises,
+	"no-async-constructor-work": noAsyncConstructorWork,
 };
 
 /** Runs one rule over a fixture directory using the real parser adapter. */
@@ -118,6 +120,60 @@ describe("backend-doctor/no-floating-promises (AC-1..6)", () => {
 	it("stays silent on false-positive-prone valid fixtures (AC-4..6)", () => {
 		expect(
 			scanFixture("no-floating-promises", "no-floating-promises/valid"),
+		).toEqual([]);
+	});
+});
+
+describe("backend-doctor/no-async-constructor-work (AC-11..12)", () => {
+	const message =
+		"Constructor starts async work without awaiting it; initialization races with first use. Move the work into an explicit init method that callers can await.";
+
+	it("flags async work started in constructors with exact diagnostics (AC-11)", () => {
+		expect(
+			summarize(
+				scanFixture(
+					"no-async-constructor-work",
+					"no-async-constructor-work/invalid",
+				),
+			),
+		).toEqual([
+			{
+				file: path.join("no-async-constructor-work", "invalid", "fetch.ts"),
+				line: 3,
+				column: 3,
+				message,
+				severity: "warn",
+				category: "Correctness",
+			},
+			{
+				file: path.join("no-async-constructor-work", "invalid", "helper-fn.ts"),
+				line: 4,
+				column: 3,
+				message,
+				severity: "warn",
+				category: "Correctness",
+			},
+			{
+				file: path.join(
+					"no-async-constructor-work",
+					"invalid",
+					"this-method.ts",
+				),
+				line: 7,
+				column: 3,
+				message,
+				severity: "warn",
+				category: "Correctness",
+			},
+		]);
+	});
+
+	it("stays silent on void-prefixed and synchronous constructors (AC-12)", () => {
+		expect(
+			scanFixture(
+				"no-async-constructor-work",
+				"no-async-constructor-work/valid",
+			),
 		).toEqual([]);
 	});
 });
