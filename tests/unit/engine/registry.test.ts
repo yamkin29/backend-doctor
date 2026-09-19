@@ -50,4 +50,15 @@ describe("registry (AC-9)", () => {
 		const rule = spyRule("backend-doctor/c", calls);
 		expect(defineRule(rule)).toBe(rule);
 	});
+
+	it("keeps the frameworks field on registered rules (spec 004)", () => {
+		const calls: string[] = [];
+		const packRule = defineRule({
+			...spyRule("backend-doctor/nest/only", calls),
+			frameworks: ["nest"],
+		});
+		registerRule(packRule);
+
+		expect(allRules().at(-1)?.frameworks).toEqual(["nest"]);
+	});
 });

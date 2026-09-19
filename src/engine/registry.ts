@@ -15,6 +15,12 @@ export interface RuleDefinition {
 	readonly severity: Severity;
 	/** Path of the rule doc under docs/rules/. */
 	readonly docs: string;
+	/**
+	 * Frameworks (ids from src/framework) the rule requires. The runner runs
+	 * the rule only when every listed framework is detected; absent or empty
+	 * means unconditional (spec 004, pack gate).
+	 */
+	readonly frameworks?: readonly string[];
 	create(ctx: RuleContext): void;
 }
 

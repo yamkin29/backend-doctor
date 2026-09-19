@@ -38,6 +38,7 @@ function scanFixture(ruleId: string, fixtureName: string): Diagnostic[] {
 				config: defaultConfig(),
 				adapter,
 				scanRoot: target,
+				detectedFrameworks: [],
 			}).diagnostics,
 		);
 	}

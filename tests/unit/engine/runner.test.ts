@@ -70,6 +70,15 @@ function rule(
 	});
 }
 
+/** A pack rule: only runs when every declared framework is detected (spec 004). */
+function gatedRule(
+	id: string,
+	frameworks: string[],
+	create: RuleDefinition["create"],
+): RuleDefinition {
+	return { ...rule(id, create), frameworks };
+}
+
 const scanRoot = path.join(os.tmpdir(), "backend-doctor-runner");
 const file = new FakeView(path.join(scanRoot, "src", "index.ts"));
 
@@ -77,6 +86,7 @@ function run(
 	rules: RuleDefinition[],
 	cfg = config(),
 	target = file,
+	detectedFrameworks: string[] = [],
 ): ReturnType<typeof runRules> {
 	return runRules({
 		file: target,
@@ -84,6 +94,7 @@ function run(
 		config: cfg,
 		adapter: fakeAdapter,
 		scanRoot,
+		detectedFrameworks,
 	});
 }
 
@@ -234,6 +245,90 @@ describe("runRules (AC-3/6/9)", () => {
 		]);
 		expect(diagnostics[0]?.line).toBe(7);
 		expect(diagnostics[0]?.column).toBe(9);
+	});
+});
+
+describe("runRules pack gate (AC-9/10/11, spec 004)", () => {
+	it("does not run a rule whose declared frameworks are not detected (AC-9)", () => {
+		let invoked = false;
+		const { diagnostics } = run(
+			[
+				gatedRule("backend-doctor/nest/only", ["nest"], () => {
+					invoked = true;
+				}),
+			],
+			config(),
+			file,
+			["express"],
+		);
+		expect(invoked).toBe(false);
+		expect(diagnostics).toEqual([]);
+	});
+
+	it("does not run a rule when only some declared frameworks are detected (AC-9)", () => {
+		let invoked = false;
+		run(
+			[
+				gatedRule("backend-doctor/nest/prisma", ["nest", "prisma"], () => {
+					invoked = true;
+				}),
+			],
+			config(),
+			file,
+			["nest"],
+		);
+		expect(invoked).toBe(false);
+	});
+
+	it("runs the rule once every declared framework is detected (AC-9)", () => {
+		let invoked = false;
+		const { diagnostics } = run(
+			[
+				gatedRule("backend-doctor/nest/prisma", ["nest", "prisma"], (ctx) => {
+					invoked = true;
+					ctx.report({ line: 2, column: 3, message: "pack finding" });
+				}),
+			],
+			config(),
+			file,
+			["fastify", "nest", "prisma"],
+		);
+		expect(invoked).toBe(true);
+		expect(diagnostics).toHaveLength(1);
+		expect(diagnostics[0]?.rule).toBe("backend-doctor/nest/prisma");
+	});
+
+	it("runs unconditional rules regardless of detection (AC-10)", () => {
+		let invoked = false;
+		run(
+			[
+				rule("backend-doctor/global", () => {
+					invoked = true;
+				}),
+			],
+			config(),
+			file,
+			[],
+		);
+		expect(invoked).toBe(true);
+	});
+
+	it("a config severity entry on a gated rule neither runs it nor crashes (AC-11)", () => {
+		const cfg = config({ rules: { "backend-doctor/nest/only": "error" } });
+		let invoked = false;
+		const { diagnostics, skippedChecks } = run(
+			[
+				gatedRule("backend-doctor/nest/only", ["nest"], () => {
+					invoked = true;
+				}),
+			],
+			cfg,
+			file,
+			[],
+		);
+		expect(invoked).toBe(false);
+		expect(diagnostics).toEqual([]);
+		expect(skippedChecks).toEqual([]);
 	});
 });
 

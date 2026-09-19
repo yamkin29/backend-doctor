@@ -62,6 +62,7 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
 			config: input.config,
 			adapter,
 			scanRoot: target,
+			detectedFrameworks: [],
 		});
 		diagnostics.push(...outcome.diagnostics);
 		skippedChecks.push(...outcome.skippedChecks);

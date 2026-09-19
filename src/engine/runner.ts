@@ -18,6 +18,8 @@ export interface RunRulesOptions {
 	adapter: ParserAdapter;
 	/** Scan target — the base for the relative paths inside diagnostic ids. */
 	scanRoot: string;
+	/** Framework ids detected for the project (spec 004 pack gate). */
+	detectedFrameworks: readonly string[];
 }
 
 export interface RuleRunOutcome {
@@ -27,18 +29,30 @@ export interface RuleRunOutcome {
 
 /**
  * Runs every enabled rule against one file (spec 003 AC-6/9). A rule is
- * enabled when its id is not in `config.ignore.rules` and its severity does
- * not resolve to "off". A throwing rule never fails the scan
- * (constitution §8): its partial findings are discarded and replaced by an
- * `internal` diagnostic plus a skippedChecks entry.
+ * enabled when every framework it declares is detected (spec 004 pack gate),
+ * its id is not in `config.ignore.rules` and its severity does not resolve to
+ * "off". A throwing rule never fails the scan (constitution §8): its partial
+ * findings are discarded and replaced by an `internal` diagnostic plus a
+ * skippedChecks entry.
  */
 export function runRules(opts: RunRulesOptions): RuleRunOutcome {
 	const { file, rules, config, adapter, scanRoot } = opts;
 	const relativeFile = file.getRelativePathTo(scanRoot);
+	const detected = new Set(opts.detectedFrameworks);
 	const diagnostics: Diagnostic[] = [];
 	const skippedChecks: SkippedCheck[] = [];
 
 	for (const rule of rules) {
+		// Pack gate (spec 004): a rule with declared frameworks runs only when
+		// every one of them is detected. Gated-off rules are disabled by
+		// design — no diagnostics, no skippedChecks (like severity "off").
+		if (
+			rule.frameworks !== undefined &&
+			rule.frameworks.length > 0 &&
+			!rule.frameworks.every((framework) => detected.has(framework))
+		) {
+			continue;
+		}
 		if (config.ignore.rules.includes(rule.id)) continue;
 		const severity = resolveSeverity({
 			ruleId: rule.id,
