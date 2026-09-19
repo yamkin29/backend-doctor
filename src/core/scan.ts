@@ -9,6 +9,7 @@ import {
 import { TsMorphParserAdapter } from "../engine/parser/ts-morph-adapter.js";
 import { allRules } from "../engine/registry.js";
 import { runRules, sortDiagnostics } from "../engine/runner.js";
+import { detectFrameworks } from "../framework/detect.js";
 // Importing registers the product rules (src/rules/index.ts is the explicit,
 // greppable registry — see design 003).
 import "../rules/index.js";
@@ -55,6 +56,15 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
 			reason: `${relativeTo(target, failure.filePath)}: ${failure.reason}`,
 		});
 	}
+
+	const packageRoot = findPackageRoot(target);
+	const detection = detectFrameworks({
+		packageRoot,
+		scanRoot: target,
+		files,
+	});
+	skippedChecks.push(...detection.skippedChecks);
+
 	for (const file of files) {
 		const outcome = runRules({
 			file,
@@ -62,7 +72,7 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
 			config: input.config,
 			adapter,
 			scanRoot: target,
-			detectedFrameworks: [],
+			detectedFrameworks: detection.frameworks,
 		});
 		diagnostics.push(...outcome.diagnostics);
 		skippedChecks.push(...outcome.skippedChecks);
@@ -74,8 +84,8 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
 
 	const projects: ProjectInfo[] = [
 		{
-			packageRoot: findPackageRoot(target),
-			frameworks: [],
+			packageRoot,
+			frameworks: detection.frameworks,
 			analyzedFiles,
 			analyzedFileCount: analyzedFiles.length,
 			complete: true,

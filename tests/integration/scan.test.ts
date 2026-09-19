@@ -99,6 +99,122 @@ describe("runScan on the bad-app fixture (AC-8)", () => {
 	});
 });
 
+describe("runScan framework detection (AC-1..8, spec 004)", () => {
+	function makeProject(): string {
+		return fs.mkdtempSync(path.join(os.tmpdir(), "backend-doctor-fw-"));
+	}
+
+	function writeProjectFile(
+		root: string,
+		relPath: string,
+		content: string,
+	): void {
+		const file = path.join(root, relPath);
+		fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(file, content);
+	}
+
+	it("fills projects[0].frameworks from package.json dependencies", async () => {
+		const tmp = makeProject();
+		try {
+			fs.writeFileSync(
+				path.join(tmp, "package.json"),
+				JSON.stringify({
+					name: "app",
+					dependencies: { express: "^4.19.2", lodash: "^4.17.0" },
+				}),
+			);
+			writeProjectFile(tmp, "src/index.ts", "export const x = 1;\n");
+
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(result.projects[0]?.frameworks).toEqual(["express"]);
+			expect(result.projects[0]?.packageRoot).toBe(tmp);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("detects frameworks from code markers without declared dependencies", async () => {
+		const tmp = makeProject();
+		try {
+			fs.writeFileSync(
+				path.join(tmp, "package.json"),
+				JSON.stringify({ name: "app" }),
+			);
+			writeProjectFile(
+				tmp,
+				"src/main.ts",
+				'import { Controller } from "@nestjs/common";\n',
+			);
+
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(result.projects[0]?.frameworks).toEqual(["nest"]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("detects prisma from the schema file marker", async () => {
+		const tmp = makeProject();
+		try {
+			fs.writeFileSync(
+				path.join(tmp, "package.json"),
+				JSON.stringify({ name: "app" }),
+			);
+			writeProjectFile(
+				tmp,
+				"prisma/schema.prisma",
+				"model User { id Int @id }",
+			);
+
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(result.projects[0]?.frameworks).toEqual(["prisma"]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("reports a malformed package.json via skippedChecks and keeps code markers (AC-8)", async () => {
+		const tmp = makeProject();
+		try {
+			fs.writeFileSync(path.join(tmp, "package.json"), "{ not json");
+			writeProjectFile(tmp, "src/main.ts", 'import express from "express";\n');
+
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(result.projects[0]?.frameworks).toEqual(["express"]);
+			expect(result.projects[0]?.skippedChecks).toEqual([
+				{
+					check: "framework-detection",
+					reason: expect.stringContaining("package.json"),
+				},
+			]);
+			expect(result.projects[0]?.complete).toBe(true);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+});
+
 describe("runScan fail-soft behavior (AC-2, constitution §8)", () => {
 	it("records unreadable files in skippedChecks and keeps scanning", async () => {
 		const skipRootCheck =
