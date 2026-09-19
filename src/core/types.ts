@@ -1,14 +1,17 @@
 export type Severity = "error" | "warn";
 
-export type DiagnosticCategory =
-	| "Bugs"
-	| "Correctness"
-	| "Performance"
-	| "Security"
-	| "Architecture"
-	| "Maintainability"
-	| "Configuration"
-	| "Runtime";
+export const DIAGNOSTIC_CATEGORIES = [
+	"Bugs",
+	"Correctness",
+	"Performance",
+	"Security",
+	"Architecture",
+	"Maintainability",
+	"Configuration",
+	"Runtime",
+] as const;
+
+export type DiagnosticCategory = (typeof DIAGNOSTIC_CATEGORIES)[number];
 
 export interface Diagnostic {
 	/** Deterministic id: <file>::<line>:<col>::<rule>::<occurrence digest>. */

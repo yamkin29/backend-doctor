@@ -10,6 +10,12 @@
 	"bin": {
 		"backend-doctor": "./dist/bin/backend-doctor.js"
 	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
 	"files": [
 		"dist"
 	],
@@ -22,11 +28,14 @@
 	},
 	"dependencies": {
 		"commander": "^14.0.0",
-		"picocolors": "^1.1.1"
+		"jiti": "^2.7.0",
+		"picocolors": "^1.1.1",
+		"picomatch": "^4.0.7"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.0.0",
 		"@types/node": "^22.0.0",
+		"@types/picomatch": "^4.0.3",
 		"tsup": "^8.0.0",
 		"typescript": "^5.6.0",
 		"vitest": "^3.0.0"
