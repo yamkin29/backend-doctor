@@ -1,5 +1,6 @@
 import { Command, CommanderError, Option } from "commander";
 import type { ReportFormat } from "../reporters/index.js";
+import { initCommand } from "./commands/init.js";
 import { type ScanCommandOptions, scanCommand } from "./commands/scan.js";
 import { resolveVersion } from "./version.js";
 
@@ -51,6 +52,16 @@ export async function run(argv: string[]): Promise<number> {
 				...opts,
 				format: opts.format as ReportFormat,
 			});
+		});
+
+	program
+		.command("init")
+		.description(
+			"Create a starter backend-doctor.config.ts in the current directory.",
+		)
+		.exitOverride()
+		.action(async () => {
+			exit = initCommand();
 		});
 
 	try {

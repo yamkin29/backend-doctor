@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { STARTER_CONFIG } from "../../src/cli/commands/init.js";
 import { expectSuccess, makeTmpDir, runCli } from "./helpers.js";
 
 function writeConfig(dir: string, name: string, content: string): string {
@@ -111,5 +112,37 @@ describe("AC-13: config errors exit 2 with stdout clean", () => {
 		expect(result.exitCode).toBe(2);
 		expect(result.stderr).toContain("invalid JSON");
 		expect(result.stdout).toBe("");
+	});
+});
+
+describe("AC-12: init", () => {
+	it("creates a starter config in an empty directory", () => {
+		const proj = makeTmpDir();
+		const result = runCli(["init"], { cwd: proj });
+		expectSuccess(result);
+		const file = path.join(proj, "backend-doctor.config.ts");
+		expect(fs.existsSync(file)).toBe(true);
+		expect(fs.readFileSync(file, "utf8")).toBe(STARTER_CONFIG);
+		expect(result.stdout).toContain("backend-doctor.config.ts");
+	});
+
+	it("refuses to overwrite an existing config file", () => {
+		const proj = makeTmpDir();
+		writeConfig(proj, "backend-doctor.config.ts", "export default {};");
+		const result = runCli(["init"], { cwd: proj });
+		expect(result.exitCode).toBe(2);
+		expect(
+			fs.readFileSync(path.join(proj, "backend-doctor.config.ts"), "utf8"),
+		).toBe("export default {};");
+	});
+
+	it("creates a config file even when only a package.json key exists", () => {
+		const proj = makeTmpDir();
+		writeConfig(proj, "package.json", JSON.stringify({ backendDoctor: {} }));
+		const result = runCli(["init"], { cwd: proj });
+		expectSuccess(result);
+		expect(fs.existsSync(path.join(proj, "backend-doctor.config.ts"))).toBe(
+			true,
+		);
 	});
 });
