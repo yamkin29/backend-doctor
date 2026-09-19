@@ -12,6 +12,7 @@ import { runRules } from "../../../src/engine/runner.js";
 import { noAsyncConstructorWork } from "../../../src/rules/async/no-async-constructor-work.js";
 import { noAsyncForeachCallback } from "../../../src/rules/async/no-async-foreach-callback.js";
 import { noFloatingPromises } from "../../../src/rules/async/no-floating-promises.js";
+import { unhandledJsonParse } from "../../../src/rules/async/unhandled-json-parse.js";
 
 const FIXTURE_ROOT = path.resolve(
 	import.meta.dirname,
@@ -23,6 +24,7 @@ const rules: Record<string, RuleDefinition> = {
 	"no-floating-promises": noFloatingPromises,
 	"no-async-constructor-work": noAsyncConstructorWork,
 	"no-async-foreach-callback": noAsyncForeachCallback,
+	"unhandled-json-parse": unhandledJsonParse,
 };
 
 /** Runs one rule over a fixture directory using the real parser adapter. */
@@ -226,6 +228,42 @@ describe("backend-doctor/no-async-foreach-callback (AC-7..8)", () => {
 				"no-async-foreach-callback",
 				"no-async-foreach-callback/valid",
 			),
+		).toEqual([]);
+	});
+});
+
+describe("backend-doctor/unhandled-json-parse (AC-9..10)", () => {
+	const message =
+		"JSON.parse throws on malformed input and this call is not guarded by try/catch; a bad payload will crash this code path. Guard it or validate the input first.";
+
+	it("flags unguarded JSON.parse inside function bodies (AC-9)", () => {
+		expect(
+			summarize(
+				scanFixture("unhandled-json-parse", "unhandled-json-parse/invalid"),
+			),
+		).toEqual([
+			{
+				file: path.join("unhandled-json-parse", "invalid", "finally-only.ts"),
+				line: 3,
+				column: 10,
+				message,
+				severity: "warn",
+				category: "Bugs",
+			},
+			{
+				file: path.join("unhandled-json-parse", "invalid", "in-function.ts"),
+				line: 2,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Bugs",
+			},
+		]);
+	});
+
+	it("stays silent inside try/catch and at module top level (AC-10)", () => {
+		expect(
+			scanFixture("unhandled-json-parse", "unhandled-json-parse/valid"),
 		).toEqual([]);
 	});
 });
