@@ -174,3 +174,67 @@ describe("loadConfig — registry validation", () => {
 		).rejects.toThrow(/unknown rule id/);
 	});
 });
+
+describe("loadConfig — explicit path (AC-2)", () => {
+	it("loads exactly the given file, skipping discovery", async () => {
+		mkdir("empty");
+		const file = write(
+			"elsewhere/my.config.ts",
+			'export default { ignore: { files: ["explicit/**"] } };',
+		);
+
+		const config = await loadConfig({
+			startDir: path.join(root, "empty"),
+			explicitPath: file,
+			knownRuleIds: NO_RULES,
+		});
+
+		expect(config.source).toEqual({ kind: "file", path: file });
+		expect(config.ignore.files).toEqual(["explicit/**"]);
+	});
+
+	it("errors when the explicit path does not exist, naming the path", async () => {
+		const missing = path.join(root, "does-not-exist.config.ts");
+
+		await expect(
+			loadConfig({
+				startDir: root,
+				explicitPath: missing,
+				knownRuleIds: NO_RULES,
+			}),
+		).rejects.toThrow(missing);
+	});
+});
+
+describe("loadConfig — module shape (AC-4)", () => {
+	it("accepts a named `config` export", async () => {
+		write("proj/backend-doctor.config.ts", "export const config = {};");
+		const config = await loadConfig({
+			startDir: path.join(root, "proj"),
+			knownRuleIds: NO_RULES,
+		});
+		expect(config.rules).toEqual({});
+	});
+
+	it("accepts a CJS plain object export", async () => {
+		write("proj/backend-doctor.config.js", "module.exports = { rules: {} };");
+		const config = await loadConfig({
+			startDir: path.join(root, "proj"),
+			knownRuleIds: NO_RULES,
+		});
+		expect(config.rules).toEqual({});
+	});
+
+	it("errors naming the file when there is no default or config export", async () => {
+		const file = write(
+			"proj/backend-doctor.config.ts",
+			"export const something = 1;",
+		);
+		await expect(
+			loadConfig({ startDir: path.join(root, "proj"), knownRuleIds: NO_RULES }),
+		).rejects.toThrow(file);
+		await expect(
+			loadConfig({ startDir: path.join(root, "proj"), knownRuleIds: NO_RULES }),
+		).rejects.toThrow(ConfigError);
+	});
+});

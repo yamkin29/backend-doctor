@@ -16,6 +16,8 @@ const PACKAGE_KEY = "backendDoctor";
 export interface LoadConfigOptions {
 	/** Scan target directory (pass the file's dirname for file targets). */
 	startDir: string;
+	/** Explicit --config path; skips discovery entirely. */
+	explicitPath?: string;
 	knownRuleIds?: ReadonlySet<string>;
 }
 
@@ -28,6 +30,13 @@ export async function loadConfig(
 	opts: LoadConfigOptions,
 ): Promise<ResolvedConfig> {
 	const knownRuleIds = opts.knownRuleIds ?? new Set<string>();
+	if (opts.explicitPath) {
+		const file = path.resolve(opts.explicitPath);
+		if (!fs.existsSync(file)) {
+			throw new ConfigError(`Config file does not exist: ${file}`);
+		}
+		return loadFromFile(file, knownRuleIds);
+	}
 	const dir = findConfigDirectory(path.resolve(opts.startDir));
 	if (!dir) return defaultConfig();
 
@@ -133,11 +142,25 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 /** Accepts `export default {…}`, `export const config = {…}` or plain CJS objects. */
 function extractDefaultOrConfig(mod: unknown, file: string): UserConfig {
-	if (isObject(mod)) {
-		if (isObject(mod.default)) return mod.default as UserConfig;
-		if (isObject(mod.config)) return mod.config as UserConfig;
-		// CJS `module.exports = {…}` arrives as a plain object.
-		if (!("__esModule" in mod)) return mod as UserConfig;
+	if (!isObject(mod)) {
+		throw new ConfigError(`${file}: must export a default or config object`);
 	}
+	// jiti interop may expose a *virtual* `default` (the module itself) when no
+	// default export exists, so only an own "default" property counts.
+	const hasOwnDefault = Object.getOwnPropertyNames(mod).includes("default");
+	if (hasOwnDefault && isObject(mod.default)) {
+		return mod.default as UserConfig;
+	}
+	if (isObject(mod.config)) return mod.config as UserConfig;
+	// CJS `module.exports = {…}` arrives as a plain object; transpiled ESM
+	// modules without default/config are rejected instead of being mistaken
+	// for a config.
+	if (!isTranspiledEsModule(mod)) return mod as UserConfig;
 	throw new ConfigError(`${file}: must export a default or config object`);
+}
+
+function isTranspiledEsModule(mod: Record<string, unknown>): boolean {
+	if ("__esModule" in mod || "$$esModule" in mod) return true;
+	const tagged = mod as { [Symbol.toStringTag]?: unknown };
+	return tagged[Symbol.toStringTag] === "Module";
 }
