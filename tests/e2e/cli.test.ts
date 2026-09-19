@@ -29,3 +29,20 @@ describe("AC-2: pretty empty scan", () => {
 		expect(result.stdout).toContain("0 issues");
 	});
 });
+
+describe("AC-3: json report", () => {
+	it("prints exactly one schemaVersion-1 document to stdout, exits 0", () => {
+		const dir = makeTmpDir();
+		const result = runCli(["scan", dir, "--format", "json"]);
+		expectSuccess(result);
+		const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
+		expect(Object.keys(parsed).sort()).toEqual(
+			["diagnostics", "directory", "mode", "projects", "schemaVersion"].sort(),
+		);
+		expect(parsed.schemaVersion).toBe(1);
+		expect(parsed.mode).toBe("full");
+		expect(parsed.directory).toBe(dir);
+		expect(parsed.diagnostics).toEqual([]);
+		expect(parsed.projects).toEqual([]);
+	});
+});

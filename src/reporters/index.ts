@@ -1,4 +1,5 @@
 import type { ReportDocument } from "../core/types.js";
+import { renderJson } from "./json.js";
 import { renderPretty } from "./pretty.js";
 
 export type ReportFormat = "pretty" | "json" | "jsonl";
@@ -9,9 +10,11 @@ export function getReporter(format: ReportFormat): Reporter {
 	switch (format) {
 		case "pretty":
 			return renderPretty;
+		case "json":
+			return renderJson;
 		default:
-			// Unreachable once --format choices are enforced (AC-8, T6);
-			// json/jsonl reporters land in T4/T5.
+			// jsonl lands in T5; unreachable once --format choices are enforced
+			// (AC-8, T6).
 			throw new Error(`Reporter not implemented yet: ${format}`);
 	}
 }
