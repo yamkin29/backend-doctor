@@ -1,10 +1,12 @@
 /**
- * Parser module boundary (constitution §4): these types are the ONLY surface
- * rules may couple to. Only `ts-morph-adapter.ts` imports ts-morph at runtime;
- * this module re-exports, as types, just the AST vocabulary rules need so far
- * — the adapter grows when the first rule needs more (spec 003, design §1).
+ * Parser module boundary (constitution §4): these exports are the ONLY
+ * surface rules may couple to. Only `ts-morph-adapter.ts` imports ts-morph
+ * at runtime; this module re-exports just the AST vocabulary rules need so
+ * far — the adapter grows when the first rule needs more (spec 003, design
+ * §1). `Node` is re-exported as a value because ts-morph's type guards
+ * (`Node.isIdentifier`, …) live on the class.
  */
-import type { Node } from "ts-morph";
+import { Node } from "ts-morph";
 
 export type {
 	BinaryExpression,
@@ -12,10 +14,10 @@ export type {
 	Expression,
 	Identifier,
 	NewExpression,
-	Node,
 	PropertyAccessExpression,
 } from "ts-morph";
 export { SyntaxKind } from "ts-morph";
+export { Node };
 
 export interface SourceFilePosition {
 	/** 1-based line. */

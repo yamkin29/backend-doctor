@@ -13,5 +13,6 @@
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true
 	},
-	"include": ["src", "tests", "tsup.config.ts", "vitest.config.ts"]
+	"include": ["src", "tests", "tsup.config.ts", "vitest.config.ts"],
+	"exclude": ["tests/fixtures"]
 }
