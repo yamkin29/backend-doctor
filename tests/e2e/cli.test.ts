@@ -46,3 +46,12 @@ describe("AC-3: json report", () => {
 		expect(parsed.projects).toEqual([]);
 	});
 });
+
+describe("AC-4: jsonl empty scan", () => {
+	it("prints nothing to stdout and exits 0", () => {
+		const dir = makeTmpDir();
+		const result = runCli(["scan", dir, "--format", "jsonl"]);
+		expectSuccess(result);
+		expect(result.stdout).toBe("");
+	});
+});
