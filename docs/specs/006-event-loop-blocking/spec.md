@@ -1,6 +1,6 @@
 # Spec 006 — Event-loop blocking rules (F006)
 
-- **Status:** Approved (2026-09-19)
+- **Status:** Implemented (2026-09-19)
 - **Phase:** 1 — Node core rules
 - **Depends on:** F003 (Engine core) — Done; F004 (Framework detection) — Done
   (pack gate exists; unused by these rules); F005 (Async correctness) — Done

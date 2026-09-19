@@ -67,7 +67,7 @@ projects[] }`.
 | F003 | Engine core (ParserAdapter, RuleRegistry, RuleRunner, reporters) | 0 | Done |
 | F004 | Framework detection (nest/express/fastify/prisma) | 0 | Done |
 | F005 | Rules: async correctness | 1 | Done |
-| F006 | Rules: event-loop blocking | 1 | Planned |
+| F006 | Rules: event-loop blocking | 1 | Done |
 | F007 | Rules: security (Node core) | 1 | Planned |
 | F008 | Nest app model (decorators → app model) | 2 | Planned |
 | F009 | Rules: Nest DI | 2 | Planned |

@@ -65,6 +65,17 @@ Under interop, a module **without** a default export exposes a *virtual*
   CallExpressions** (ExpressionStatement wraps VoidExpression /
   AwaitExpression), so a "statement-level call" check suppresses them for
   free — no special cases needed (spec 005 design decision 3).
+- **`while`/`do…while` conditions come from `getExpression()`, not
+  `getCondition()`** (ts-morph v28): `WhileStatement`/`DoStatement` are
+  built on an `ExpressionedNode` base and their runtime prototypes carry
+  almost nothing; `getCondition()` exists only on `ForStatement`. Calling
+  it on a while node is a runtime TypeError — which the runner converts
+  into an `internal` diagnostic (constitution §8, bit spec 006 T3, caught
+  by the exact-diagnostic test). Probing those prototype chains can even
+  throw `InvalidOperationError` ("node has no source file") from property
+  getters. Use `asKind(SyntaxKind.ForStatement)` → `getCondition()`,
+  `asKind(SyntaxKind.WhileStatement / SyntaxKind.DoStatement)` →
+  `getExpression()`.
 
 ### pnpm 12
 
