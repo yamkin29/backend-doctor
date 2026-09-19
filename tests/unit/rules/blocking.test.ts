@@ -7,8 +7,9 @@ import {
 	SUPPORTED_EXTENSIONS,
 } from "../../../src/engine/collect.js";
 import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapter.js";
-import type { RuleDefinition } from "../../../src/engine/registry.js";
+import { allRules, type RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
+import { noCpuBoundLoop } from "../../../src/rules/blocking/cpu-bound-loop.js";
 import { noSyncCrypto } from "../../../src/rules/blocking/sync-crypto.js";
 import { noSyncFsInRequestPath } from "../../../src/rules/blocking/sync-fs.js";
 // Importing registers the product rules (src/rules/index.ts is the explicit,
@@ -24,6 +25,7 @@ const FIXTURE_ROOT = path.resolve(
 const rules: Record<string, RuleDefinition> = {
 	"no-sync-fs-in-request-path": noSyncFsInRequestPath,
 	"no-sync-crypto": noSyncCrypto,
+	"no-cpu-bound-loop": noCpuBoundLoop,
 };
 
 /** Runs one rule over a fixture directory using the real parser adapter. */
@@ -166,5 +168,69 @@ describe("backend-doctor/no-sync-crypto (AC-4..6)", () => {
 
 	it("stays silent at top level, with callbacks, on promisified APIs and non-crypto imports (AC-5..6)", () => {
 		expect(scanFixture("no-sync-crypto", "no-sync-crypto/valid")).toEqual([]);
+	});
+});
+
+describe("backend-doctor/no-cpu-bound-loop (AC-7..8)", () => {
+	const message =
+		"This loop runs a literal-bounded body of at least 10,000 iterations without awaiting, so it blocks the event loop for the whole run. Move heavy CPU work off the request path or chunk it with setImmediate.";
+
+	it("flags literal-bounded await-free loops with exact diagnostics (AC-7)", () => {
+		expect(
+			summarize(scanFixture("no-cpu-bound-loop", "no-cpu-bound-loop/invalid")),
+		).toEqual([
+			{
+				file: path.join("no-cpu-bound-loop", "invalid", "do-while-literal.ts"),
+				line: 4,
+				column: 2,
+				message,
+				severity: "warn",
+				category: "Performance",
+			},
+			{
+				file: path.join("no-cpu-bound-loop", "invalid", "for-literal.ts"),
+				line: 3,
+				column: 2,
+				message,
+				severity: "warn",
+				category: "Performance",
+			},
+			{
+				file: path.join("no-cpu-bound-loop", "invalid", "while-literal.ts"),
+				line: 4,
+				column: 2,
+				message,
+				severity: "warn",
+				category: "Performance",
+			},
+		]);
+	});
+
+	it("stays silent below the threshold, on awaits, variables and computed bounds (AC-8)", () => {
+		expect(scanFixture("no-cpu-bound-loop", "no-cpu-bound-loop/valid")).toEqual(
+			[],
+		);
+	});
+});
+
+describe("product registry (AC-9)", () => {
+	it("registers all three blocking rules alongside the async and security packs", () => {
+		const ids = allRules().map((rule) => rule.id);
+		for (const id of [
+			"backend-doctor/no-sync-fs-in-request-path",
+			"backend-doctor/no-sync-crypto",
+			"backend-doctor/no-cpu-bound-loop",
+			"backend-doctor/no-eval",
+			"backend-doctor/no-new-func",
+			"backend-doctor/no-floating-promises",
+			"backend-doctor/no-async-constructor-work",
+			"backend-doctor/no-async-foreach-callback",
+			"backend-doctor/unhandled-json-parse",
+			"backend-doctor/no-unhandled-emitter-error",
+		]) {
+			expect(ids, id).toContain(id);
+		}
+		expect(ids).toHaveLength(10);
+		expect(new Set(ids).size).toBe(ids.length);
 	});
 });

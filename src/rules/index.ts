@@ -4,6 +4,7 @@ import { noAsyncForeachCallback } from "./async/no-async-foreach-callback.js";
 import { noFloatingPromises } from "./async/no-floating-promises.js";
 import { noUnhandledEmitterError } from "./async/no-unhandled-emitter-error.js";
 import { unhandledJsonParse } from "./async/unhandled-json-parse.js";
+import { noCpuBoundLoop } from "./blocking/cpu-bound-loop.js";
 import { noSyncCrypto } from "./blocking/sync-crypto.js";
 import { noSyncFsInRequestPath } from "./blocking/sync-fs.js";
 import { noEval } from "./security/no-eval.js";
@@ -24,6 +25,7 @@ const productRules = [
 	noUnhandledEmitterError,
 	noSyncFsInRequestPath,
 	noSyncCrypto,
+	noCpuBoundLoop,
 ];
 
 for (const rule of productRules) {

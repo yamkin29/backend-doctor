@@ -191,6 +191,11 @@ function isInConstructorBody(call: CallExpression): boolean {
 	return false;
 }
 
+/** True when the node itself is a function-like declaration. */
+export function isFunctionLike(node: Node): boolean {
+	return FUNCTION_LIKE_KINDS.includes(node.getKind());
+}
+
 /** True when any ancestor of the node is a function-like declaration. */
 export function isInsideFunctionLike(node: Node): boolean {
 	let current: Node | undefined = node;
