@@ -38,7 +38,8 @@
 - tsup needs an object-form `entry` (`"bin/backend-doctor": "src/bin/…"`) to preserve
   the `dist/bin/` layout; a single array entry flattened the output.
 - `expectSuccess` (AC-9 assertion) was introduced in T2 rather than retrofitted in T7.
-- Environment: pnpm 12.4.2 runs via `npx -y pnpm@latest` (no global pnpm; local
-  corepack has stale signing keys). esbuild's postinstall is approved in
-  `pnpm-workspace.yaml` (pnpm 12 convention).
+- Environment: during F001, pnpm 12.4.2 ran via `npx -y pnpm@latest` (no global pnpm;
+  local corepack has stale signing keys). As of 2026-09-19 pnpm 12.4.2 is installed
+  globally (homebrew) — use plain `pnpm` for all package operations. esbuild's
+  postinstall is approved in `pnpm-workspace.yaml` (pnpm 12 convention).
 - Locked versions: biome 2.5.14, tsup 8.5.1, commander ^14, vitest ^3.
