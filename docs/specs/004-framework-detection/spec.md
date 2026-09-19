@@ -1,10 +1,18 @@
 # Spec 004 — Framework detection (F004)
 
-- **Status:** Draft — pending review
+- **Status:** Implemented (2026-09-19)
 - **Phase:** 0 — Foundation
 - **Depends on:** F001 (CLI), F002 (Config), F003 (Engine core) — all Done
 - **Blocks:** F008–F012 (Nest app model and Nest/Prisma rule packs run only when
   their framework is detected)
+
+## Resolution (recorded at implementation, 2026-09-19)
+
+All open questions were approved as recommended: (1) `dependencies` only;
+(2) ids `nest`/`express`/`fastify`/`prisma`; (3) allowlist Nest markers;
+(4) pretty `Frameworks:` line; (5) no manual gate override; (6) no new
+dependencies. Deviations from the task sketch are listed in
+[tasks.md](./tasks.md).
 
 ## Problem
 

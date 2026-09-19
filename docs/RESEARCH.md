@@ -39,6 +39,16 @@ Under interop, a module **without** a default export exposes a *virtual*
   also stamp the library entry.
 - `external: ["jiti"]` — its loader machinery must run as the real dependency.
 
+### ts-morph
+
+- **Type guards need the runtime class.** `import { type Node } from "ts-morph"`
+  compiles but `Node.isImportDeclaration(...)`-style guards then fail at runtime
+  with `Node is not defined`. Import `Node` as a value wherever guards are used
+  (bit spec 004 T1; `parser/types.ts` re-exports it as a value for this reason).
+- Dynamic `import("…")` is a CallExpression whose expression has kind
+  `SyntaxKind.ImportKeyword` — collect its first StringLiteral argument for
+  module specifiers (see `getModuleSpecifiers()` in `ts-morph-adapter.ts`).
+
 ### pnpm 12
 
 - Build-script approvals live in `pnpm-workspace.yaml` → `allowBuilds: esbuild: true`

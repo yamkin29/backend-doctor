@@ -65,7 +65,7 @@ projects[] }`.
 | F001 | CLI skeleton & DX | 0 | Done |
 | F002 | Config (defineConfig, walk-up, overrides) | 0 | Done |
 | F003 | Engine core (ParserAdapter, RuleRegistry, RuleRunner, reporters) | 0 | Done |
-| F004 | Framework detection (nest/express/fastify/prisma) | 0 | Planned |
+| F004 | Framework detection (nest/express/fastify/prisma) | 0 | Done |
 | F005 | Rules: async correctness | 1 | Planned |
 | F006 | Rules: event-loop blocking | 1 | Planned |
 | F007 | Rules: security (Node core) | 1 | Planned |
