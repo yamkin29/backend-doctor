@@ -46,6 +46,23 @@ export interface FileLoadFailure {
 	reason: string;
 }
 
+/** What a rule hands to the reporter. Positions are resolved by the engine. */
+export interface ReportInput {
+	/** AST node to derive the 1-based position from (wins over line/column). */
+	node?: Node;
+	/** 1-based fallback position when no node is given. */
+	line?: number;
+	/** 1-based fallback position when no node is given. */
+	column?: number;
+	message: string;
+}
+
+/** Given to rule `create` bodies; rules never stamp ids, severity or tags. */
+export interface RuleContext {
+	file: SourceFileView;
+	report(input: ReportInput): void;
+}
+
 export interface ProjectLoadResult {
 	files: SourceFileView[];
 	failures: FileLoadFailure[];

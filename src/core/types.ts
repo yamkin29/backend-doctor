@@ -26,6 +26,17 @@ export interface Diagnostic {
 	tags: string[];
 }
 
+/**
+ * A file or check that could not run but did not fail the scan
+ * (constitution §8 — fail soft, report loud).
+ */
+export interface SkippedCheck {
+	/** Stable scope: "read" for source-loading failures, the rule id for crashed rules. */
+	check: string;
+	/** Human-readable reason; starts with the target-relative file path when known. */
+	reason: string;
+}
+
 export type ScanMode = "full";
 
 export const REPORT_SCHEMA_VERSION = 1;
@@ -36,6 +47,7 @@ export interface ProjectInfo {
 	analyzedFiles: string[];
 	analyzedFileCount: number;
 	complete: boolean;
+	skippedChecks: SkippedCheck[];
 }
 
 export interface ReportDocument {
