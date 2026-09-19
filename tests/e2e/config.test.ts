@@ -62,3 +62,54 @@ describe("AC-11: --dump-config", () => {
 		expect(parsed.source).toEqual({ kind: "default", path: null });
 	});
 });
+
+describe("AC-13: config errors exit 2 with stdout clean", () => {
+	it("rejects an invalid severity, naming the field path", () => {
+		const proj = makeTmpDir();
+		writeConfig(
+			proj,
+			"backend-doctor.config.json",
+			JSON.stringify({ categories: { Bugs: "fatal" } }),
+		);
+		const result = runCli(["scan", proj]);
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain('categories["Bugs"]');
+		expect(result.stdout).toBe("");
+	});
+
+	it("rejects unknown rule ids", () => {
+		const proj = makeTmpDir();
+		writeConfig(
+			proj,
+			"backend-doctor.config.json",
+			JSON.stringify({ rules: { "backend-doctor/ghost": "off" } }),
+		);
+		const result = runCli(["scan", proj]);
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain("unknown rule id");
+		expect(result.stderr).toContain("backend-doctor/ghost");
+		expect(result.stdout).toBe("");
+	});
+
+	it("rejects a config module without default or config export, naming the file", () => {
+		const proj = makeTmpDir();
+		writeConfig(
+			proj,
+			"backend-doctor.config.ts",
+			"export const something = 1;",
+		);
+		const result = runCli(["scan", proj]);
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain("backend-doctor.config.ts");
+		expect(result.stdout).toBe("");
+	});
+
+	it("rejects invalid JSON configs", () => {
+		const proj = makeTmpDir();
+		writeConfig(proj, "backend-doctor.config.json", "{ not json");
+		const result = runCli(["scan", proj]);
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain("invalid JSON");
+		expect(result.stdout).toBe("");
+	});
+});
