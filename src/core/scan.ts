@@ -1,10 +1,13 @@
+import type { ResolvedConfig } from "../config/types.js";
 import type { Diagnostic, ProjectInfo } from "./types.js";
 
 export interface ScanInput {
 	/** Absolute path of the scan target (directory or file). */
 	directory: string;
-	/** Glob patterns to exclude. No-ops until the engine lands (F003). */
+	/** Effective ignore globs (config ignore.files unioned with CLI --ignore). */
 	ignore: string[];
+	/** Fully resolved, validated config. Consumed by the engine (F003). */
+	config: ResolvedConfig;
 }
 
 export interface ScanResult {

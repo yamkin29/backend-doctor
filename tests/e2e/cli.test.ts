@@ -66,16 +66,17 @@ describe("AC-5: unknown option", () => {
 	});
 });
 
-describe("AC-6: --config is reserved", () => {
-	it("exits 2 and points to F002", () => {
-		const result = runCli([
-			"scan",
-			makeTmpDir(),
-			"--config",
-			"backend-doctor.config.ts",
-		]);
+// F002 made --config functional (spec 002, AC-2); the F001 "reserved" contract
+// evolved accordingly: a missing explicit config file now exits 2 naming it.
+describe("AC-6: --config with a missing file", () => {
+	it("exits 2 and names the missing path", () => {
+		const missing = path.join(
+			os.tmpdir(),
+			`bd-missing-config-${process.pid}-${Date.now()}.ts`,
+		);
+		const result = runCli(["scan", makeTmpDir(), "--config", missing]);
 		expect(result.exitCode).toBe(2);
-		expect(result.stderr).toContain("F002");
+		expect(result.stderr).toContain(missing);
 	});
 });
 

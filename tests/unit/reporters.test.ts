@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defaultConfig } from "../../src/config/types.js";
 import { buildReport } from "../../src/core/report.js";
 import type { ScanResult } from "../../src/core/scan.js";
 import type { Diagnostic } from "../../src/core/types.js";
@@ -6,7 +7,7 @@ import { renderJsonl } from "../../src/reporters/jsonl.js";
 import { renderPretty } from "../../src/reporters/pretty.js";
 
 const emptyResult: ScanResult = {
-	input: { directory: "/tmp/proj", ignore: [] },
+	input: { directory: "/tmp/proj", ignore: [], config: defaultConfig() },
 	diagnostics: [],
 	projects: [],
 };

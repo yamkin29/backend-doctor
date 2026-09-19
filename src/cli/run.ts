@@ -1,4 +1,3 @@
-import process from "node:process";
 import { Command, CommanderError, Option } from "commander";
 import type { ReportFormat } from "../reporters/index.js";
 import { type ScanCommandOptions, scanCommand } from "./commands/scan.js";
@@ -37,20 +36,17 @@ export async function run(argv: string[]): Promise<number> {
 		)
 		.option(
 			"--ignore <glob>",
-			"exclude glob; repeatable; no-op until the engine lands (F003)",
+			"exclude glob; repeatable; unioned with config ignore.files",
 			collectIgnore,
 			[],
 		)
-		.option("--config <path>", "reserved; config files are supported from F002")
+		.option("--config <path>", "load exactly this config file, skip discovery")
+		.option(
+			"--dump-config",
+			"print the resolved config as JSON and exit without scanning",
+		)
 		.exitOverride()
 		.action(async (pathArg: string | undefined, opts: ScanCommandOptions) => {
-			if (opts.config !== undefined) {
-				process.stderr.write(
-					"The --config option is reserved: config files are supported from F002.\n",
-				);
-				exit = 2;
-				return;
-			}
 			exit = await scanCommand(pathArg, {
 				...opts,
 				format: opts.format as ReportFormat,

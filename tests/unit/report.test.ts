@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defaultConfig } from "../../src/config/types.js";
 import { exitCodeFor } from "../../src/core/exit-code.js";
 import { buildReport } from "../../src/core/report.js";
 import type { ScanResult } from "../../src/core/scan.js";
@@ -6,7 +7,7 @@ import type { Diagnostic } from "../../src/core/types.js";
 
 function resultWith(diagnostics: Diagnostic[]): ScanResult {
 	return {
-		input: { directory: "/tmp/proj", ignore: [] },
+		input: { directory: "/tmp/proj", ignore: [], config: defaultConfig() },
 		diagnostics,
 		projects: [],
 	};
