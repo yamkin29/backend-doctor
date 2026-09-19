@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { type Node, Project, type SourceFile } from "ts-morph";
+import { Node, Project, type SourceFile, SyntaxKind } from "ts-morph";
 import type {
 	FileLoadFailure,
 	ParserAdapter,
@@ -81,6 +81,29 @@ class TsMorphSourceFileView implements SourceFileView {
 
 	forEachDescendant(cb: (node: Node) => "skip" | undefined): void {
 		this.sourceFile.forEachDescendant((node) => cb(node));
+	}
+
+	getModuleSpecifiers(): string[] {
+		const specifiers: string[] = [];
+		this.sourceFile.forEachDescendant((node) => {
+			if (Node.isImportDeclaration(node)) {
+				specifiers.push(node.getModuleSpecifierValue());
+				return;
+			}
+			if (Node.isCallExpression(node)) {
+				const expression = node.getExpression();
+				const isRequire =
+					Node.isIdentifier(expression) && expression.getText() === "require";
+				const isDynamicImport =
+					expression.getKind() === SyntaxKind.ImportKeyword;
+				if (!isRequire && !isDynamicImport) return;
+				const argument = node.getArguments()[0];
+				if (argument && Node.isStringLiteral(argument)) {
+					specifiers.push(argument.getText().slice(1, -1));
+				}
+			}
+		});
+		return specifiers;
 	}
 
 	getText(node?: Node): string {

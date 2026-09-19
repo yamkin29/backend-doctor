@@ -107,4 +107,40 @@ describe("TsMorphParserAdapter (AC-2)", () => {
 
 		expect(files[0]?.getRelativePathTo(root)).toBe(path.join("src", "rel.ts"));
 	});
+
+	it("getModuleSpecifiers collects static imports, require and dynamic import calls (AC-5)", () => {
+		const file = write(
+			"src/specifiers.ts",
+			[
+				'import express from "express";',
+				'import type { Foo } from "foo-types";',
+				'const fs = require("node:fs");',
+				'const load = async () => (await import("./lazy.js")).default;',
+				'const notAModule = "express"; // not a module reference',
+				"// import from-a-comment",
+				"export const all = [fs, load, notAModule];",
+			].join("\n"),
+		);
+		const adapter = new TsMorphParserAdapter();
+		const { files } = adapter.createProject([file]);
+		const view = files.at(0);
+		if (!view) throw new Error("expected the file to load");
+
+		expect(view.getModuleSpecifiers()).toEqual([
+			"express",
+			"foo-types",
+			"node:fs",
+			"./lazy.js",
+		]);
+	});
+
+	it("getModuleSpecifiers returns an empty list without module references", () => {
+		const file = write("src/plain.ts", 'export const value = "express";\n');
+		const adapter = new TsMorphParserAdapter();
+		const { files } = adapter.createProject([file]);
+		const view = files.at(0);
+		if (!view) throw new Error("expected the file to load");
+
+		expect(view.getModuleSpecifiers()).toEqual([]);
+	});
 });

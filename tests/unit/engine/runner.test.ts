@@ -27,6 +27,10 @@ class FakeView implements SourceFileView {
 
 	forEachDescendant(): void {}
 
+	getModuleSpecifiers(): string[] {
+		return [];
+	}
+
 	getText(): string {
 		return this.text;
 	}

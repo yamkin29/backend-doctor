@@ -37,6 +37,13 @@ export interface SourceFileView {
 	 * skips that node's subtree.
 	 */
 	forEachDescendant(cb: (node: Node) => "skip" | undefined): void;
+	/**
+	 * Module specifiers referenced by the file: static imports, dynamic
+	 * `import("…")` and `require("…")` calls. Occurrences in comments or
+	 * unrelated string literals are not module references and are excluded
+	 * (spec 004, code markers).
+	 */
+	getModuleSpecifiers(): string[];
 	/** Full source text, or the text of the given node. */
 	getText(node?: Node): string;
 }
