@@ -1,11 +1,20 @@
 # Spec 005 — Async-correctness rules (F005)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-19)
 - **Phase:** 1 — Node core rules
 - **Depends on:** F003 (Engine core) — Done; F004 (Framework detection) — Done
   (the pack gate exists; none of these rules declare frameworks)
 - **Blocks:** F006 (event-loop blocking reuses the statement-level call
   heuristics), F011 (Nest lifecycle rules reuse the constructor-work detection)
+
+## Resolution (recorded at approval, 2026-09-19)
+
+The user approved the spec as recommended. All open questions resolved as
+recommended: (1) minimal `no-floating-promises` scope; (2) `void` suppression;
+(3) module top-level `JSON.parse` exempt; (4) constructor bodies owned
+exclusively by `no-async-constructor-work`; (5) id
+`no-unhandled-emitter-error`; (6) categories as in the contract table;
+(7) `fetch` as the only known-async global; (8) no new dependencies.
 
 ## Problem
 
