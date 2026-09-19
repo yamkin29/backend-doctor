@@ -9,6 +9,7 @@ import {
 import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapter.js";
 import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
+import { noSyncCrypto } from "../../../src/rules/blocking/sync-crypto.js";
 import { noSyncFsInRequestPath } from "../../../src/rules/blocking/sync-fs.js";
 // Importing registers the product rules (src/rules/index.ts is the explicit,
 // greppable registry) so the AC-9 registry assertion sees them.
@@ -22,6 +23,7 @@ const FIXTURE_ROOT = path.resolve(
 /** Short fixture id → rule under test (grows with each rule task). */
 const rules: Record<string, RuleDefinition> = {
 	"no-sync-fs-in-request-path": noSyncFsInRequestPath,
+	"no-sync-crypto": noSyncCrypto,
 };
 
 /** Runs one rule over a fixture directory using the real parser adapter. */
@@ -124,5 +126,45 @@ describe("backend-doctor/no-sync-fs-in-request-path (AC-1..3)", () => {
 				"no-sync-fs-in-request-path/valid",
 			),
 		).toEqual([]);
+	});
+});
+
+describe("backend-doctor/no-sync-crypto (AC-4..6)", () => {
+	const message =
+		"Synchronous crypto work (key derivation, random bytes) blocks the event loop for the full computation. Use the callback or promisified async API instead.";
+
+	it("flags sync crypto calls inside function bodies with exact diagnostics (AC-4..5)", () => {
+		expect(
+			summarize(scanFixture("no-sync-crypto", "no-sync-crypto/invalid")),
+		).toEqual([
+			{
+				file: path.join("no-sync-crypto", "invalid", "pbkdf2-sync.ts"),
+				line: 4,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Performance",
+			},
+			{
+				file: path.join("no-sync-crypto", "invalid", "random-bytes-sync.ts"),
+				line: 4,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Performance",
+			},
+			{
+				file: path.join("no-sync-crypto", "invalid", "scrypt-sync.ts"),
+				line: 4,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Performance",
+			},
+		]);
+	});
+
+	it("stays silent at top level, with callbacks, on promisified APIs and non-crypto imports (AC-5..6)", () => {
+		expect(scanFixture("no-sync-crypto", "no-sync-crypto/valid")).toEqual([]);
 	});
 });
