@@ -2,7 +2,7 @@ import type { Options } from "tsup";
 import { defineConfig } from "tsup";
 
 export const buildOptions: Options = {
-	entry: ["src/bin/backend-doctor.ts"],
+	entry: { "bin/backend-doctor": "src/bin/backend-doctor.ts" },
 	format: ["esm"],
 	target: "node20",
 	clean: true,
