@@ -1,6 +1,6 @@
 # Spec 006 — Event-loop blocking rules (F006)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-19)
 - **Phase:** 1 — Node core rules
 - **Depends on:** F003 (Engine core) — Done; F004 (Framework detection) — Done
   (pack gate exists; unused by these rules); F005 (Async correctness) — Done
@@ -9,6 +9,14 @@
 - **Blocks:** F007 (security rules reuse the module-import-gate heuristic),
   F019 (runtime attribution will confirm or replace these static heuristics
   with measured blocking)
+
+## Resolution (recorded at approval, 2026-09-19)
+
+The user approved the spec as recommended. All open questions resolved as
+recommended: (1) ship the literal-bound CPU-bound loop heuristic; (2) loop
+threshold 10,000; (3) module-import gate for the fs/crypto rules; (4) id
+`no-cpu-bound-loop`; (5) categories as in the contract table (all
+`Performance`); (6) no new dependencies.
 
 ## Problem
 
