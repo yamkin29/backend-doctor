@@ -201,7 +201,8 @@ export function isInsideFunctionLike(node: Node): boolean {
 	return false;
 }
 
-function nearestFunctionLike(node: Node | undefined): Node | undefined {
+/** Nearest enclosing function-like node, or undefined at module level. */
+export function nearestFunctionLike(node: Node | undefined): Node | undefined {
 	let current = node;
 	while (current) {
 		if (FUNCTION_LIKE_KINDS.includes(current.getKind())) return current;

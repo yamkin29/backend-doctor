@@ -2,6 +2,8 @@ import { registerRule } from "../engine/registry.js";
 import { noAsyncConstructorWork } from "./async/no-async-constructor-work.js";
 import { noAsyncForeachCallback } from "./async/no-async-foreach-callback.js";
 import { noFloatingPromises } from "./async/no-floating-promises.js";
+import { noUnhandledEmitterError } from "./async/no-unhandled-emitter-error.js";
+import { unhandledJsonParse } from "./async/unhandled-json-parse.js";
 import { noEval } from "./security/no-eval.js";
 import { noNewFunc } from "./security/no-new-func.js";
 
@@ -16,6 +18,8 @@ const productRules = [
 	noFloatingPromises,
 	noAsyncConstructorWork,
 	noAsyncForeachCallback,
+	unhandledJsonParse,
+	noUnhandledEmitterError,
 ];
 
 for (const rule of productRules) {

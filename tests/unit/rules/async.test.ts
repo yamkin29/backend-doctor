@@ -7,12 +7,16 @@ import {
 	SUPPORTED_EXTENSIONS,
 } from "../../../src/engine/collect.js";
 import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapter.js";
-import type { RuleDefinition } from "../../../src/engine/registry.js";
+import { allRules, type RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { noAsyncConstructorWork } from "../../../src/rules/async/no-async-constructor-work.js";
 import { noAsyncForeachCallback } from "../../../src/rules/async/no-async-foreach-callback.js";
 import { noFloatingPromises } from "../../../src/rules/async/no-floating-promises.js";
+import { noUnhandledEmitterError } from "../../../src/rules/async/no-unhandled-emitter-error.js";
 import { unhandledJsonParse } from "../../../src/rules/async/unhandled-json-parse.js";
+// Importing registers the product rules (src/rules/index.ts is the explicit,
+// greppable registry) so the AC-16 registry assertion sees them.
+import "../../../src/rules/index.js";
 
 const FIXTURE_ROOT = path.resolve(
 	import.meta.dirname,
@@ -24,6 +28,7 @@ const rules: Record<string, RuleDefinition> = {
 	"no-floating-promises": noFloatingPromises,
 	"no-async-constructor-work": noAsyncConstructorWork,
 	"no-async-foreach-callback": noAsyncForeachCallback,
+	"no-unhandled-emitter-error": noUnhandledEmitterError,
 	"unhandled-json-parse": unhandledJsonParse,
 };
 
@@ -265,5 +270,73 @@ describe("backend-doctor/unhandled-json-parse (AC-9..10)", () => {
 		expect(
 			scanFixture("unhandled-json-parse", "unhandled-json-parse/valid"),
 		).toEqual([]);
+	});
+});
+
+describe("backend-doctor/no-unhandled-emitter-error (AC-13..15)", () => {
+	const message =
+		"This emitter emits 'error' with no 'error' listener registered; Node.js raises an uncaught exception for unhandled 'error' events. Register a listener or remove the emit.";
+
+	it("flags 'error' emissions without a listener (AC-13)", () => {
+		expect(
+			summarize(
+				scanFixture(
+					"no-unhandled-emitter-error",
+					"no-unhandled-emitter-error/invalid",
+				),
+			),
+		).toEqual([
+			{
+				file: path.join(
+					"no-unhandled-emitter-error",
+					"invalid",
+					"emit-no-listener.ts",
+				),
+				line: 4,
+				column: 1,
+				message,
+				severity: "warn",
+				category: "Bugs",
+			},
+			{
+				file: path.join(
+					"no-unhandled-emitter-error",
+					"invalid",
+					"this-emitter.ts",
+				),
+				line: 7,
+				column: 3,
+				message,
+				severity: "warn",
+				category: "Bugs",
+			},
+		]);
+	});
+
+	it("stays silent with a listener, other events, param emitters and subclasses (AC-14..15)", () => {
+		expect(
+			scanFixture(
+				"no-unhandled-emitter-error",
+				"no-unhandled-emitter-error/valid",
+			),
+		).toEqual([]);
+	});
+});
+
+describe("product registry (AC-16)", () => {
+	it("registers all five async rules alongside the security pack", () => {
+		const ids = allRules().map((rule) => rule.id);
+		for (const id of [
+			"backend-doctor/no-floating-promises",
+			"backend-doctor/no-async-foreach-callback",
+			"backend-doctor/unhandled-json-parse",
+			"backend-doctor/no-async-constructor-work",
+			"backend-doctor/no-unhandled-emitter-error",
+			"backend-doctor/no-eval",
+			"backend-doctor/no-new-func",
+		]) {
+			expect(ids, id).toContain(id);
+		}
+		expect(new Set(ids).size).toBe(ids.length);
 	});
 });
