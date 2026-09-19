@@ -254,3 +254,93 @@ describe("runScan fail-soft behavior (AC-2, constitution §8)", () => {
 		}
 	});
 });
+
+describe("runScan async rules (AC-17, spec 005)", () => {
+	function writeAsyncProject(): string {
+		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "backend-doctor-async-"));
+		const src = path.join(tmp, "src");
+		fs.mkdirSync(src, { recursive: true });
+		fs.writeFileSync(
+			path.join(src, "worker.ts"),
+			[
+				"async function job(): Promise<void> {}",
+				"job();",
+				'const items = ["a", "b"];',
+				"items.forEach(async () => {",
+				"\tawait Promise.resolve();",
+				"});",
+				"function parse(raw: string): unknown {",
+				"\treturn JSON.parse(raw);",
+				"}",
+			].join("\n"),
+		);
+		return tmp;
+	}
+
+	it("reports the three async violations in report order at warn severity", async () => {
+		const tmp = writeAsyncProject();
+		try {
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(
+				result.diagnostics.map((d) => [d.line, d.column, d.rule, d.severity]),
+			).toEqual([
+				[2, 1, "backend-doctor/no-floating-promises", "warn"],
+				[4, 1, "backend-doctor/no-async-foreach-callback", "warn"],
+				[8, 9, "backend-doctor/unhandled-json-parse", "warn"],
+			]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("escalates one rule to error without touching the others", async () => {
+		const tmp = writeAsyncProject();
+		try {
+			const config = defaultConfig();
+			config.rules["backend-doctor/no-floating-promises"] = "error";
+
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config,
+			});
+
+			const byRule = Object.fromEntries(
+				result.diagnostics.map((d) => [d.rule, d.severity]),
+			);
+			expect(byRule).toEqual({
+				"backend-doctor/no-floating-promises": "error",
+				"backend-doctor/no-async-foreach-callback": "warn",
+				"backend-doctor/unhandled-json-parse": "warn",
+			});
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("suppresses a rule listed in ignore.rules (AC-17 off path)", async () => {
+		const tmp = writeAsyncProject();
+		try {
+			const config = defaultConfig();
+			config.ignore.rules = ["backend-doctor/no-floating-promises"];
+
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config,
+			});
+
+			expect(result.diagnostics.map((d) => d.rule)).not.toContain(
+				"backend-doctor/no-floating-promises",
+			);
+			expect(result.diagnostics).toHaveLength(2);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+});
