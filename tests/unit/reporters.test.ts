@@ -49,6 +49,30 @@ describe("renderPretty", () => {
 		expect(out).toContain("Demo problem");
 		expect(out).toContain("Summary: 1 error, 0 warnings (1 issue)");
 	});
+	it("renders a Frameworks line under Directory when frameworks are detected (AC-14)", () => {
+		const doc = buildReport({
+			...emptyResult,
+			projects: [
+				{
+					packageRoot: "/tmp/proj",
+					frameworks: ["nest", "prisma"],
+					analyzedFiles: ["src/main.ts"],
+					analyzedFileCount: 1,
+					complete: true,
+					skippedChecks: [],
+				},
+			],
+		});
+
+		const out = renderPretty(doc);
+		const lines = out.split("\n");
+		expect(lines[1]).toBe("Directory: /tmp/proj");
+		expect(lines[2]).toBe("Frameworks: nest, prisma");
+	});
+
+	it("renders no Frameworks line when the list is empty", () => {
+		expect(renderPretty(buildReport(emptyResult))).not.toContain("Frameworks:");
+	});
 });
 
 describe("renderJsonl", () => {

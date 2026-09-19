@@ -17,6 +17,13 @@ export function renderPretty(doc: ReportDocument): string {
 	lines.push(`${pc.bold("backend-doctor")} scan — ${doc.mode} mode`);
 	lines.push(`Directory: ${doc.directory}`);
 
+	// One additive line, only when a framework was detected (spec 004) —
+	// framework-less reports stay byte-identical to the pre-004 output.
+	const frameworks = doc.projects[0]?.frameworks ?? [];
+	if (frameworks.length > 0) {
+		lines.push(`Frameworks: ${frameworks.join(", ")}`);
+	}
+
 	const errors = doc.diagnostics.filter((d) => d.severity === "error").length;
 	const warnings = doc.diagnostics.length - errors;
 
