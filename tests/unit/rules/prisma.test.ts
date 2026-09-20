@@ -10,6 +10,7 @@ import {
 import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapter.js";
 import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
+import { findManyWithoutPagination } from "../../../src/rules/prisma/find-many-without-pagination.js";
 import { noPrismaNPlusOne } from "../../../src/rules/prisma/no-prisma-n-plus-one.js";
 import { noUnsafeRawQuery } from "../../../src/rules/prisma/no-unsafe-raw-query.js";
 
@@ -23,6 +24,7 @@ const FLAT_ROOT = path.resolve(
 const rulesById: Record<string, RuleDefinition> = {
 	"no-prisma-n-plus-one": noPrismaNPlusOne,
 	"no-unsafe-raw-query": noUnsafeRawQuery,
+	"find-many-without-pagination": findManyWithoutPagination,
 };
 
 /**
@@ -200,6 +202,81 @@ describe("backend-doctor/no-unsafe-raw-query (AC-2, AC-5, AC-9)", () => {
 		expect(
 			fs.existsSync(path.join(REPO_ROOT, noUnsafeRawQuery.docs)),
 			noUnsafeRawQuery.docs,
+		).toBe(true);
+	});
+});
+
+const PAGINATION_MESSAGE =
+	"findMany without take loads every matching row into memory; bound the result set with take (and skip or cursor for paging).";
+
+describe("backend-doctor/find-many-without-pagination (AC-3, AC-5, AC-9)", () => {
+	it("flags unbounded findMany calls with exact diagnostics (AC-3)", () => {
+		expect(
+			summarize(
+				scanFixture(
+					"find-many-without-pagination",
+					"find-many-without-pagination/invalid",
+				),
+			),
+		).toEqual([
+			{
+				file: path.join(
+					"find-many-without-pagination",
+					"invalid",
+					"no-args.ts",
+				),
+				line: 6,
+				column: 9,
+				message: PAGINATION_MESSAGE,
+				severity: "warn",
+				category: "Performance",
+			},
+			{
+				file: path.join(
+					"find-many-without-pagination",
+					"invalid",
+					"no-take.ts",
+				),
+				line: 6,
+				column: 9,
+				message: PAGINATION_MESSAGE,
+				severity: "warn",
+				category: "Performance",
+			},
+		]);
+	});
+
+	it("stays silent on take, spread or variable arguments and other query methods (AC-3, AC-5)", () => {
+		expect(
+			scanFixture(
+				"find-many-without-pagination",
+				"find-many-without-pagination/valid",
+			),
+		).toEqual([]);
+	});
+
+	it("produces nothing when prisma is not detected (AC-6)", () => {
+		expect(
+			scanFixture(
+				"find-many-without-pagination",
+				"find-many-without-pagination/invalid",
+				[],
+			),
+		).toEqual([]);
+	});
+
+	it("ships valid/invalid fixtures and a rule doc (AC-9)", () => {
+		for (const dir of ["valid", "invalid"]) {
+			expect(
+				fs.existsSync(
+					path.join(FLAT_ROOT, "find-many-without-pagination", dir),
+				),
+				dir,
+			).toBe(true);
+		}
+		expect(
+			fs.existsSync(path.join(REPO_ROOT, findManyWithoutPagination.docs)),
+			findManyWithoutPagination.docs,
 		).toBe(true);
 	});
 });
