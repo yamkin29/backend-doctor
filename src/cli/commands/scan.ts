@@ -12,12 +12,17 @@ import { exitCodeFor } from "../../core/exit-code.js";
 import { buildReport } from "../../core/report.js";
 import { runScan } from "../../core/scan.js";
 import { getReporter, type ReportFormat } from "../../reporters/index.js";
+import { resolveScope } from "../../scope/resolve.js";
+import type { ResolvedScope, ScopeOption } from "../../scope/types.js";
 
 export interface ScanCommandOptions {
 	format: ReportFormat;
 	ignore: string[];
 	config?: string;
 	dumpConfig?: boolean;
+	scope: ScopeOption;
+	base?: string;
+	file: string[];
 }
 
 const REGISTERED_RULE_IDS = new Set(
@@ -29,6 +34,16 @@ export async function scanCommand(
 	opts: ScanCommandOptions,
 ): Promise<number> {
 	const target = path.resolve(pathArg ?? process.cwd());
+
+	// Flag-combination validation precedes any I/O (spec 015 AC-8).
+	if (opts.file.length > 0 && opts.scope !== "files") {
+		process.stderr.write("--file requires --scope files\n");
+		return 2;
+	}
+	if (opts.scope === "files" && opts.file.length === 0) {
+		process.stderr.write("--scope files requires at least one --file\n");
+		return 2;
+	}
 
 	let config: ResolvedConfig;
 	try {
@@ -61,10 +76,28 @@ export async function scanCommand(
 		return 2;
 	}
 
+	// Scope resolution (spec 015): a failure is a usage-environment error
+	// (exit 2), never a silent fallback to a full scan.
+	let scope: ResolvedScope | undefined;
+	if (opts.scope !== "all") {
+		const resolution = await resolveScope({
+			target,
+			mode: opts.scope,
+			base: opts.base ?? "HEAD",
+			files: opts.file.map((filePath) => path.resolve(filePath)),
+		});
+		if (!resolution.ok) {
+			process.stderr.write(`${resolution.error}\n`);
+			return 2;
+		}
+		scope = resolution.scope;
+	}
+
 	const result = await runScan({
 		directory: target,
 		ignore: resolved.ignore.files,
 		config: resolved,
+		scope,
 	});
 	const doc = buildReport(result);
 	const output = getReporter(opts.format)(doc);

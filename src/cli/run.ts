@@ -4,7 +4,7 @@ import { initCommand } from "./commands/init.js";
 import { type ScanCommandOptions, scanCommand } from "./commands/scan.js";
 import { resolveVersion } from "./version.js";
 
-function collectIgnore(value: string, previous: string[]): string[] {
+function collectRepeatable(value: string, previous: string[]): string[] {
 	return [...previous, value];
 }
 
@@ -38,7 +38,25 @@ export async function run(argv: string[]): Promise<number> {
 		.option(
 			"--ignore <glob>",
 			"exclude glob; repeatable; unioned with config ignore.files",
-			collectIgnore,
+			collectRepeatable,
+			[],
+		)
+		.addOption(
+			new Option(
+				"--scope <mode>",
+				"restrict the scan: all|changed|files|lines (spec 015)",
+			)
+				.choices(["all", "changed", "files", "lines"])
+				.default("all"),
+		)
+		.option(
+			"--base <ref>",
+			'git ref for --scope changed|lines (default: "HEAD")',
+		)
+		.option(
+			"--file <path>",
+			"with --scope files: analyze exactly this file; repeatable",
+			collectRepeatable,
 			[],
 		)
 		.option("--config <path>", "load exactly this config file, skip discovery")
