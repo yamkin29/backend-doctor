@@ -11,6 +11,7 @@ import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapte
 import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { noPrismaNPlusOne } from "../../../src/rules/prisma/no-prisma-n-plus-one.js";
+import { noUnsafeRawQuery } from "../../../src/rules/prisma/no-unsafe-raw-query.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const FLAT_ROOT = path.resolve(
@@ -21,6 +22,7 @@ const FLAT_ROOT = path.resolve(
 /** Short fixture id → rule under test (grows with each rule task). */
 const rulesById: Record<string, RuleDefinition> = {
 	"no-prisma-n-plus-one": noPrismaNPlusOne,
+	"no-unsafe-raw-query": noUnsafeRawQuery,
 };
 
 /**
@@ -131,6 +133,73 @@ describe("backend-doctor/no-prisma-n-plus-one (AC-1, AC-5, AC-9)", () => {
 		expect(
 			fs.existsSync(path.join(REPO_ROOT, noPrismaNPlusOne.docs)),
 			noPrismaNPlusOne.docs,
+		).toBe(true);
+	});
+});
+
+const RAW_QUERY_MESSAGE =
+	"Raw query text is built dynamically here: interpolated input allows SQL injection. Use the tagged-template form prisma.$queryRaw`…` so values become parameters, or compose fragments with Prisma.sql / Prisma.join.";
+
+describe("backend-doctor/no-unsafe-raw-query (AC-2, AC-5, AC-9)", () => {
+	it("flags dynamic raw-query text with exact diagnostics (AC-2)", () => {
+		expect(
+			summarize(
+				scanFixture("no-unsafe-raw-query", "no-unsafe-raw-query/invalid"),
+			),
+		).toEqual([
+			{
+				file: path.join("no-unsafe-raw-query", "invalid", "concat-unsafe.ts"),
+				line: 6,
+				column: 9,
+				message: RAW_QUERY_MESSAGE,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join(
+					"no-unsafe-raw-query",
+					"invalid",
+					"plain-call-dynamic.ts",
+				),
+				line: 6,
+				column: 9,
+				message: RAW_QUERY_MESSAGE,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-unsafe-raw-query", "invalid", "template-unsafe.ts"),
+				line: 6,
+				column: 9,
+				message: RAW_QUERY_MESSAGE,
+				severity: "warn",
+				category: "Security",
+			},
+		]);
+	});
+
+	it("stays silent on tagged templates, literals, Prisma.sql and span-free templates (AC-2, AC-5)", () => {
+		expect(
+			scanFixture("no-unsafe-raw-query", "no-unsafe-raw-query/valid"),
+		).toEqual([]);
+	});
+
+	it("produces nothing when prisma is not detected (AC-6)", () => {
+		expect(
+			scanFixture("no-unsafe-raw-query", "no-unsafe-raw-query/invalid", []),
+		).toEqual([]);
+	});
+
+	it("ships valid/invalid fixtures and a rule doc (AC-9)", () => {
+		for (const dir of ["valid", "invalid"]) {
+			expect(
+				fs.existsSync(path.join(FLAT_ROOT, "no-unsafe-raw-query", dir)),
+				dir,
+			).toBe(true);
+		}
+		expect(
+			fs.existsSync(path.join(REPO_ROOT, noUnsafeRawQuery.docs)),
+			noUnsafeRawQuery.docs,
 		).toBe(true);
 	});
 });

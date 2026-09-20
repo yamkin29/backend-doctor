@@ -25,6 +25,7 @@ export type {
 	PropertyAssignment,
 	SpreadElement,
 	StringLiteral,
+	TaggedTemplateExpression,
 } from "ts-morph";
 export { SyntaxKind } from "ts-morph";
 export { Node };
