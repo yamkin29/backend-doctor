@@ -1,0 +1,67 @@
+name: "backend-doctor"
+description: >-
+  Deterministic static analyzer for Node.js/NestJS backends — advisory PR
+  surfaces (sticky summary, inline review comments, commit status).
+
+inputs:
+  blocking:
+    description: >-
+      Failure policy: none (advisory, never fails), error (fails on
+      error-severity findings), warn (fails on any finding).
+    default: "none"
+  base:
+    description: >-
+      Git ref the lines diff is computed against. Empty means
+      origin/<PR base branch>.
+    default: ""
+  directory:
+    description: "Directory to scan."
+    default: "."
+  comment:
+    description: "Post the sticky PR summary comment."
+    default: "true"
+  review-comments:
+    description: "Post inline review comments on changed lines."
+    default: "true"
+  commit-status:
+    description: "Report a commit status on the PR head SHA."
+    default: "true"
+  review-comments-max:
+    description: "Maximum number of inline review comments."
+    default: "50"
+  version:
+    description: "backend-doctor version to install from npm."
+    default: "latest"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Install backend-doctor
+      shell: bash
+      run: npm install -g "backend-doctor@${{ inputs.version }}"
+
+    - name: Scan changed lines
+      shell: bash
+      run: |
+        base="${{ inputs.base }}"
+        if [ -z "$base" ]; then
+          base="origin/${{ github.event.pull_request.base.ref }}"
+        fi
+        # Exit 1 means findings — advisory mode keeps going. Exit 2 leaves
+        # no report behind, which the report step turns into a loud failure.
+        backend-doctor scan "${{ inputs.directory }}" --scope lines --base "$base" --format json > "$GITHUB_WORKSPACE/backend-doctor-report.json" || true
+
+    - name: Report
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        args=(ci report --report "$GITHUB_WORKSPACE/backend-doctor-report.json" --blocking "${{ inputs.blocking }}" --max-review-comments "${{ inputs.review-comments-max }}")
+        if [ "${{ inputs.comment }}" != "true" ]; then args+=(--no-comment); fi
+        if [ "${{ inputs.review-comments }}" != "true" ]; then args+=(--no-review-comments); fi
+        if [ "${{ inputs.commit-status }}" != "true" ]; then args+=(--no-commit-status); fi
+        backend-doctor "${args[@]}"
