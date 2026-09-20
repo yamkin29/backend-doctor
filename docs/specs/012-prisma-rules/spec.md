@@ -1,6 +1,6 @@
 # Spec 012 — Rules: Prisma (F012)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-20)
 - **Phase:** 2 — Nest specifics & Prisma
 - **Depends on:** F004 (framework detection — the `prisma` markers already
   ship) — Done; F003 (engine core, pack gate) — Done; F005/F006/F007 (shared
@@ -8,6 +8,18 @@
   walking) — Done; F011 (pack + fixture + doc patterns this spec reuses) —
   Done
 - **Blocks:** F022 (eval corpus consumes this pack)
+
+## Resolution (recorded at approval, 2026-09-20)
+
+The user approved the spec as recommended ("принято"). All open questions
+resolved as recommended: (1) the N+1 trigger is "awaited read query
+lexically inside a loop body" — no outer-`findMany` conjunction, reads-only
+vocabulary; (2) the raw-query rule flags dynamic text only (`*Unsafe`
+variants: any non-literal argument; plain `$queryRaw`/`$executeRaw`:
+provably dynamic), tagged templates and `Prisma.sql` stay silent, category
+Security; (3) the transaction vocabulary is awaited bare `fetch`, awaited
+`axios`-rooted member calls, and `setTimeout`/`setInterval`, with the
+documented recall holes; (4) no new dependencies.
 
 ## Problem
 
