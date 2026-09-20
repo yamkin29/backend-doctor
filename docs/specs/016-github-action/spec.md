@@ -1,6 +1,6 @@
 # Spec 016 — GitHub Action: `ci install`, composite action, PR surfaces (F016)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-20)
 - **Phase:** 4 — Integrations
 - **Depends on:** F001 CLI skeleton (Done), F002 Config (Done), F003 Engine core + reporters (Done), F015 Diff scope (Done — `--scope lines` + merge-base `--base` exist for exactly this consumer)
 - **Blocks:** — (the action's default `npm install` path *activates* at F023 npm publish, but nothing consumes F016)
@@ -338,6 +338,14 @@ Steps:
   (the new command is additive).
 
 ## Open questions for review
+
+All five were resolved on approval (2026-09-20) by adopting the
+recommendations: (1) default ref `yamkin29/backend-doctor@v1` with an
+`--action-ref` override flag; (2) the action installs the CLI from npm with a
+`version` input; (3) posting lives in the `ci report` CLI subcommand (network
+calls happen outside analysis; the engine stays network-free); (4) blocking
+modes `none|error|warn`, default `none`, exit 1 = threshold hit; (5) the
+workflow triggers on `pull_request` only.
 
 1. **Action identity: what `uses:` ref does `ci install` bake in?** The
    composite action lives at this repository's root, so the generated workflow
