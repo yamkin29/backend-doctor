@@ -4,11 +4,34 @@ import { exitCodeFor } from "../../src/core/exit-code.js";
 import { buildReport } from "../../src/core/report.js";
 import type { ScanResult } from "../../src/core/scan.js";
 import type { Diagnostic } from "../../src/core/types.js";
+import type { ResolvedScope, ScopeMode } from "../../src/scope/types.js";
 
 function resultWith(diagnostics: Diagnostic[]): ScanResult {
 	return {
 		input: { directory: "/tmp/proj", ignore: [], config: defaultConfig() },
 		diagnostics,
+		projects: [],
+	};
+}
+
+function scopeWithMode(mode: ScopeMode, base?: string): ResolvedScope {
+	return {
+		mode,
+		files: new Set<string>(),
+		lineRanges: new Map(),
+		...(base !== undefined ? { base } : {}),
+	};
+}
+
+function scopedResultWith(scope: ResolvedScope): ScanResult {
+	return {
+		input: {
+			directory: "/tmp/proj",
+			ignore: [],
+			config: defaultConfig(),
+			scope,
+		},
+		diagnostics: [],
 		projects: [],
 	};
 }
@@ -42,6 +65,29 @@ describe("buildReport", () => {
 	it("passes diagnostics through unchanged", () => {
 		const doc = buildReport(resultWith([warnDiagnostic]));
 		expect(doc.diagnostics).toEqual([warnDiagnostic]);
+	});
+});
+
+describe("buildReport — scope (spec 015)", () => {
+	it("mirrors the scope mode into the report mode", () => {
+		const doc = buildReport(scopedResultWith(scopeWithMode("files")));
+		expect(doc.mode).toBe("files");
+	});
+
+	it("carries scope.base only for changed and lines scopes", () => {
+		const changed = buildReport(
+			scopedResultWith(scopeWithMode("changed", "main")),
+		);
+		expect(changed.mode).toBe("changed");
+		expect(changed.scope).toEqual({ base: "main" });
+
+		const lines = buildReport(scopedResultWith(scopeWithMode("lines", "HEAD")));
+		expect(lines.mode).toBe("lines");
+		expect(lines.scope).toEqual({ base: "HEAD" });
+
+		const files = buildReport(scopedResultWith(scopeWithMode("files")));
+		expect(files.scope).toBeUndefined();
+		expect(Object.keys(files)).not.toContain("scope");
 	});
 });
 

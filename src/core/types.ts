@@ -1,6 +1,7 @@
 export type Severity = "error" | "warn";
 
 import type { NestAppModel } from "../framework/nest/model.js";
+import type { ScopeMode } from "../scope/types.js";
 
 export const DIAGNOSTIC_CATEGORIES = [
 	"Bugs",
@@ -39,7 +40,11 @@ export interface SkippedCheck {
 	reason: string;
 }
 
-export type ScanMode = "full";
+/**
+ * The report's `mode`: `"full"` for the pre-015 whole-tree scan, otherwise
+ * the active partial scope (spec 015).
+ */
+export type ScanMode = "full" | ScopeMode;
 
 export const REPORT_SCHEMA_VERSION = 1;
 
@@ -60,6 +65,11 @@ export interface ProjectInfo {
 export interface ReportDocument {
 	schemaVersion: typeof REPORT_SCHEMA_VERSION;
 	mode: ScanMode;
+	/**
+	 * Present only for `changed`/`lines` scopes (spec 015): the resolved
+	 * `--base` the diff was computed against, so a report can be reproduced.
+	 */
+	scope?: { base: string };
 	directory: string;
 	diagnostics: Diagnostic[];
 	projects: ProjectInfo[];
