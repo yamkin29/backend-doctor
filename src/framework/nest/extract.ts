@@ -17,6 +17,7 @@ import type {
 	NestHttpVerb,
 	NestModuleEntry,
 	NestProviderEntry,
+	NestUnresolvedRef,
 } from "./model.js";
 
 const MODULE_LIST_KEYS = [
@@ -63,6 +64,7 @@ export function extractNestAppModel(
 	const controllers: NestControllerEntry[] = [];
 	const providers: NestProviderEntry[] = [];
 	const dtos: NestDtoEntry[] = [];
+	const unresolved: NestUnresolvedRef[] = [];
 
 	for (const file of files) {
 		// Suffix DTOs are gate-exempt (a plain *.dto.ts usually has no @nestjs
@@ -77,7 +79,14 @@ export function extractNestAppModel(
 				const moduleDecorator = findClassDecorator(cls, "Module");
 				if (moduleDecorator) {
 					modules.push(
-						readModule(cls, className, moduleDecorator, file, adapter),
+						readModule(
+							cls,
+							className,
+							moduleDecorator,
+							file,
+							adapter,
+							unresolved,
+						),
 					);
 				}
 				const controllerDecorator = findClassDecorator(cls, "Controller");
@@ -100,7 +109,8 @@ export function extractNestAppModel(
 	controllers.sort(compareEntries);
 	providers.sort(compareEntries);
 	dtos.sort(compareEntries);
-	return { modules, controllers, providers, dtos, unresolved: [] };
+	unresolved.sort(compareUnresolved);
+	return { modules, controllers, providers, dtos, unresolved };
 }
 
 function referencesNest(file: SourceFileView): boolean {
@@ -135,6 +145,7 @@ function readModule(
 	decorator: Decorator,
 	file: SourceFileView,
 	adapter: ParserAdapter,
+	unresolved: NestUnresolvedRef[],
 ): NestModuleEntry {
 	const position = adapter.positionOf(file, cls.getStart());
 	const entry: NestModuleEntry = {
@@ -149,14 +160,41 @@ function readModule(
 	};
 	const call = decorator.getCallExpression();
 	const metadata = call?.getArguments()[0];
-	if (!metadata || !Node.isObjectLiteralExpression(metadata)) return entry;
+	if (!metadata || !Node.isObjectLiteralExpression(metadata)) {
+		unresolved.push(
+			unresolvedRef(
+				metadata ?? decorator,
+				file,
+				adapter,
+				"@Module metadata is not a static object literal",
+			),
+		);
+		return entry;
+	}
 	for (const prop of metadata.getProperties()) {
-		if (!Node.isPropertyAssignment(prop)) continue;
+		if (!Node.isPropertyAssignment(prop)) {
+			if (Node.isSpreadAssignment(prop)) {
+				unresolved.push(
+					unresolvedRef(
+						prop,
+						file,
+						adapter,
+						"spread element in module metadata",
+					),
+				);
+			}
+			continue;
+		}
 		const key = prop.getName();
 		if (!isModuleListKey(key)) continue;
 		const value = prop.getInitializer();
-		if (!value || !Node.isArrayLiteralExpression(value)) continue;
-		entry[key] = readReferenceArray(value);
+		if (!value || !Node.isArrayLiteralExpression(value)) {
+			unresolved.push(
+				unresolvedRef(prop, file, adapter, `"${key}" is not a static array`),
+			);
+			continue;
+		}
+		entry[key] = readReferenceArray(value, key, file, adapter, unresolved);
 	}
 	return entry;
 }
@@ -245,7 +283,13 @@ function decoratorStringArgument(decorator: Decorator): string | null {
 }
 
 /** Identifier elements verbatim; object literals via their readable class reference. */
-function readReferenceArray(array: ArrayLiteralExpression): string[] {
+function readReferenceArray(
+	array: ArrayLiteralExpression,
+	listName: ModuleListKey,
+	file: SourceFileView,
+	adapter: ParserAdapter,
+	unresolved: NestUnresolvedRef[],
+): string[] {
 	const names: string[] = [];
 	for (const element of array.getElements()) {
 		if (Node.isIdentifier(element)) {
@@ -254,8 +298,25 @@ function readReferenceArray(array: ArrayLiteralExpression): string[] {
 		}
 		if (Node.isObjectLiteralExpression(element)) {
 			const classRef = readableClassReference(element);
-			if (classRef !== undefined) names.push(classRef);
+			if (classRef !== undefined) {
+				names.push(classRef);
+			} else {
+				unresolved.push(
+					unresolvedRef(
+						element,
+						file,
+						adapter,
+						`object literal element in ${listName} array without a readable class reference`,
+					),
+				);
+			}
+			continue;
 		}
+		const reason =
+			element.getKind() === SyntaxKind.SpreadElement
+				? `spread element in ${listName} array`
+				: `non-identifier element in ${listName} array`;
+		unresolved.push(unresolvedRef(element, file, adapter, reason));
 	}
 	return names;
 }
@@ -281,4 +342,25 @@ function compareEntries(
 	if (a.filePath !== b.filePath) return a.filePath < b.filePath ? -1 : 1;
 	if (a.className !== b.className) return a.className < b.className ? -1 : 1;
 	return 0;
+}
+
+function unresolvedRef(
+	node: Node,
+	file: SourceFileView,
+	adapter: ParserAdapter,
+	reason: string,
+): NestUnresolvedRef {
+	const position = adapter.positionOf(file, node.getStart());
+	return {
+		filePath: file.filePath,
+		line: position.line,
+		column: position.column,
+		reason,
+	};
+}
+
+function compareUnresolved(a: NestUnresolvedRef, b: NestUnresolvedRef): number {
+	if (a.filePath !== b.filePath) return a.filePath < b.filePath ? -1 : 1;
+	if (a.line !== b.line) return a.line - b.line;
+	return a.column - b.column;
 }

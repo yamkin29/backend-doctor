@@ -149,3 +149,45 @@ describe("nest model: dtos (AC-4)", () => {
 		expect(classNames).not.toContain("UsersService");
 	});
 });
+
+describe("nest model: unresolved references (AC-5)", () => {
+	it("records unreadable module metadata with positions and keeps readable siblings (AC-5)", () => {
+		const { unresolved, modules } = extractModel();
+		const dynamic = modules.find((m) => m.className === "DynamicModule");
+		expect(dynamic?.imports).toEqual(["UsersService"]);
+		expect(unresolved).toEqual([
+			{
+				filePath: path.join(APP_ROOT, "dynamic", "dynamic.module.ts"),
+				line: 13,
+				column: 14,
+				reason: "spread element in providers array",
+			},
+			{
+				filePath: path.join(APP_ROOT, "dynamic", "dynamic.module.ts"),
+				line: 13,
+				column: 24,
+				reason:
+					"object literal element in providers array without a readable class reference",
+			},
+			{
+				filePath: path.join(APP_ROOT, "dynamic", "dynamic.module.ts"),
+				line: 14,
+				column: 2,
+				reason: '"exports" is not a static array',
+			},
+			{
+				filePath: path.join(APP_ROOT, "dynamic", "dynamic.module.ts"),
+				line: 18,
+				column: 9,
+				reason: "@Module metadata is not a static object literal",
+			},
+			{
+				filePath: path.join(APP_ROOT, "users", "users.module.ts"),
+				line: 15,
+				column: 3,
+				reason:
+					"object literal element in providers array without a readable class reference",
+			},
+		]);
+	});
+});
