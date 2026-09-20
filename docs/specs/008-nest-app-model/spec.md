@@ -1,12 +1,26 @@
 # Spec 008 — Nest app model (F008)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-20)
 - **Phase:** 2 — Nest specifics & Prisma
 - **Depends on:** F003 (Engine core) — Done (`SourceFileView` traversal, adapter,
   runner); F004 (Framework detection) — Done (`nest` id, pack gate, `getModuleSpecifiers`)
 - **Blocks:** F009 (DI rules), F010 (Layers & DTO), F011 (Errors & lifecycle),
   F012 (Prisma rules consume controller/handler positions), F022 (eval corpus
   needs a real Nest app model to keep the FP budget honest)
+
+## Resolution (recorded at approval, 2026-09-20)
+
+The user approved the spec as recommended. All open questions resolved as
+recommended: (1) the model is exposed in the JSON report as optional
+`projects[].nest` (additive, no `schemaVersion` bump); (2) DTO detection is
+name suffix `Dto`/`DTO` plus the pinned decorator list; (3) no new
+dependencies.
+
+One design-time refinement, recorded before implementation: the `@nestjs/`
+file gate applies to **decorator-derived** entries only; suffix DTOs are
+collected from every analyzed file, because a plain `*.dto.ts` usually imports
+only `class-validator` and gating it would drop the commonest DTO shape
+(unreachable AC-4). The gate bullet and AC-6 below already carry this wording.
 
 ## Problem
 
@@ -147,11 +161,14 @@ export interface NestAppModel {
 
 ### Extraction rules
 
-- **File gate:** a file contributes entries only when
-  `file.getModuleSpecifiers()` contains a specifier starting with `@nestjs/`
-  (same prefix style as `FRAMEWORK_MARKERS`). Decorators from user code or
-  other frameworks never enter the model. Recall hole (documented): decorators
-  re-exported through a local module are missed.
+- **File gate:** decorator-derived entries (modules, controllers, providers,
+  decorator-DTOs) are collected only from files whose `getModuleSpecifiers()`
+  contain a specifier starting with `@nestjs/` (same prefix style as
+  `FRAMEWORK_MARKERS`). Decorators from user code or other frameworks never
+  enter the model. Suffix DTOs are exempt from the gate (resolution above).
+  Recall holes (documented): decorators re-exported through a local module are
+  missed; a non-Nest class coincidentally named `*Dto` inside a Nest project
+  enters the model.
 - **Modules:** class decorated `@Module` whose first argument is an object
   literal. Properties `imports`, `providers`, `controllers`, `exports` are read
   as arrays of identifiers (verbatim names, source order). In `providers`
@@ -232,7 +249,8 @@ export interface NestAppModel {
   every statically readable sibling entry.
 - **AC-6:** WHEN a file references no `@nestjs/` module specifier (including a
   file declaring its own `@Module` decorator), THE SYSTEM SHALL collect no
-  entries from it.
+  decorator-derived entries from it (suffix-DTO classes remain collectible per
+  the gate rule).
 
 **Pipeline**
 
