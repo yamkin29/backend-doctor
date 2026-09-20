@@ -1124,3 +1124,124 @@ describe("runScan errors & lifecycle rules (AC-6, spec 011)", () => {
 		}
 	});
 });
+
+describe("runScan prisma pack (AC-6, spec 012)", () => {
+	function writePrismaProject(withDependency: boolean): string {
+		const tmp = fs.mkdtempSync(
+			path.join(os.tmpdir(), "backend-doctor-prisma-"),
+		);
+		fs.writeFileSync(
+			path.join(tmp, "package.json"),
+			JSON.stringify(
+				withDependency
+					? { name: "prisma-app", dependencies: { "@prisma/client": "^5.0.0" } }
+					: { name: "plain-app", dependencies: {} },
+			),
+		);
+		const src = path.join(tmp, "src");
+		fs.mkdirSync(src, { recursive: true });
+		fs.writeFileSync(
+			path.join(src, "users.service.ts"),
+			[
+				"declare function fetch(url: string): Promise<unknown>;",
+				"declare const prisma: {",
+				"\tuser: {",
+				"\t\tfindMany(args?: unknown): Promise<{ id: number }[]>;",
+				"\t\tcreate(args: unknown): Promise<unknown>;",
+				"\t};",
+				"\tpost: { findMany(args: unknown): Promise<unknown[]> };",
+				"\t$queryRawUnsafe(query: string): Promise<unknown[]>;",
+				"\t$transaction(fn: unknown): Promise<unknown>;",
+				"};",
+				"",
+				"export async function load(): Promise<void> {",
+				"\tconst users = await prisma.user.findMany();",
+				"\tfor (const user of users) {",
+				"\t\tconst posts = await prisma.post.findMany({",
+				"\t\t\ttake: 10,",
+				"\t\t\twhere: { userId: user.id },",
+				"\t\t});",
+				"\t\tvoid posts;",
+				"\t}",
+				'\tconst logs = await prisma.$queryRawUnsafe("SELECT * FROM Log WHERE user_id = " + users.length);',
+				"\tvoid logs;",
+				"\tawait prisma.$transaction(async () => {",
+				'\t\tconst profile = await fetch("https://example.com");',
+				"\t\tvoid profile;",
+				"\t\tawait prisma.user.create({ data: { id: users.length } });",
+				"\t});",
+				"}",
+			].join("\n"),
+		);
+		return tmp;
+	}
+
+	it("reports one violation per pack rule through the full pipeline", async () => {
+		const tmp = writePrismaProject(true);
+		try {
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(result.projects[0]?.frameworks).toEqual(["prisma"]);
+			expect(
+				result.diagnostics.map((d) => [
+					rel(result, d.filePath),
+					d.line,
+					d.column,
+					d.rule,
+					d.severity,
+				]),
+			).toEqual([
+				[
+					"src/users.service.ts",
+					13,
+					22,
+					"backend-doctor/find-many-without-pagination",
+					"warn",
+				],
+				[
+					"src/users.service.ts",
+					15,
+					23,
+					"backend-doctor/no-prisma-n-plus-one",
+					"warn",
+				],
+				[
+					"src/users.service.ts",
+					21,
+					21,
+					"backend-doctor/no-unsafe-raw-query",
+					"warn",
+				],
+				[
+					"src/users.service.ts",
+					24,
+					25,
+					"backend-doctor/no-long-running-transaction",
+					"warn",
+				],
+			]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("silences the whole pack without the @prisma/client dependency", async () => {
+		const tmp = writePrismaProject(false);
+		try {
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(result.projects[0]?.frameworks).toEqual([]);
+			expect(result.diagnostics).toEqual([]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+});
