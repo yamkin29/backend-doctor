@@ -1,6 +1,6 @@
 # Spec 007 — Security rules, Node core (F007)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-20)
 - **Phase:** 1 — Node core rules
 - **Depends on:** F003 (Engine core) — Done (`defineRule`, runner, registry);
   F004 (Framework detection) — Done (pack gate exists; unused by these rules);
@@ -9,6 +9,16 @@
   `findSyncModuleCalls` collector anticipated F007's module-API rules)
 - **Blocks:** F008/F013 (real handler attribution will tighten the request-input
   heuristic), F017 (rule docs for agents), F022 (eval corpus proves the FP budget)
+
+## Resolution (recorded at approval, 2026-09-20)
+
+The user approved the spec as recommended. All open questions resolved as
+recommended: (1) ids `no-command-injection`, `no-path-traversal`,
+`no-hardcoded-secrets`, `no-weak-crypto`, `no-ssrf`, `no-unsafe-merge`;
+(2) all six under `Security`; (3) `Object.assign` is included in
+`no-unsafe-merge`; (4) secret thresholds length ≥ 16 AND entropy ≥ 3.0 bits,
+compound names only; (5) shell-exec scope is `exec`/`execSync` only;
+(6) no new dependencies.
 
 ## Problem
 
