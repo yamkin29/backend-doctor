@@ -7,6 +7,7 @@ import { unhandledJsonParse } from "./async/unhandled-json-parse.js";
 import { noCpuBoundLoop } from "./blocking/cpu-bound-loop.js";
 import { noSyncCrypto } from "./blocking/sync-crypto.js";
 import { noSyncFsInRequestPath } from "./blocking/sync-fs.js";
+import { noEmptyCatch } from "./errors/no-empty-catch.js";
 import { circularDi } from "./nest/circular-di.js";
 import { dtoFieldWithoutValidator } from "./nest/dto-field-without-validator.js";
 import { missingForwardRef } from "./nest/missing-forward-ref.js";
@@ -48,6 +49,7 @@ const productRules = [
 	noWeakCrypto,
 	noSsrf,
 	noUnsafeMerge,
+	noEmptyCatch,
 	providerNotRegistered,
 	circularDi,
 	missingForwardRef,
