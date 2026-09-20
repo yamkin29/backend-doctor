@@ -7,6 +7,7 @@ import { unhandledJsonParse } from "./async/unhandled-json-parse.js";
 import { noCpuBoundLoop } from "./blocking/cpu-bound-loop.js";
 import { noSyncCrypto } from "./blocking/sync-crypto.js";
 import { noSyncFsInRequestPath } from "./blocking/sync-fs.js";
+import { providerNotRegistered } from "./nest/provider-not-registered.js";
 import { noCommandInjection } from "./security/no-command-injection.js";
 import { noEval } from "./security/no-eval.js";
 import { noHardcodedSecrets } from "./security/no-hardcoded-secrets.js";
@@ -38,6 +39,7 @@ const productRules = [
 	noWeakCrypto,
 	noSsrf,
 	noUnsafeMerge,
+	providerNotRegistered,
 ];
 
 for (const rule of productRules) {

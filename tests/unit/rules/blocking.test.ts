@@ -233,10 +233,11 @@ describe("product registry (AC-13, spec 007)", () => {
 			"backend-doctor/no-weak-crypto",
 			"backend-doctor/no-ssrf",
 			"backend-doctor/no-unsafe-merge",
+			"backend-doctor/provider-not-registered",
 		]) {
 			expect(ids, id).toContain(id);
 		}
-		expect(ids).toHaveLength(16);
+		expect(ids).toHaveLength(17);
 		expect(new Set(ids).size).toBe(ids.length);
 	});
 });
