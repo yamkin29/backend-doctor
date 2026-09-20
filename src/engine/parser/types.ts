@@ -7,14 +7,23 @@
  * (`Node.isIdentifier`, …) live on the class.
  */
 import { Node } from "ts-morph";
+import type { NestAppModel } from "../../framework/nest/model.js";
 
 export type {
+	ArrayLiteralExpression,
 	BinaryExpression,
 	CallExpression,
+	ClassDeclaration,
+	Decorator,
 	Expression,
 	Identifier,
+	MethodDeclaration,
 	NewExpression,
+	ObjectLiteralExpression,
 	PropertyAccessExpression,
+	PropertyAssignment,
+	SpreadElement,
+	StringLiteral,
 } from "ts-morph";
 export { SyntaxKind } from "ts-morph";
 export { Node };
@@ -69,6 +78,12 @@ export interface ReportInput {
 /** Given to rule `create` bodies; rules never stamp ids, severity or tags. */
 export interface RuleContext {
 	file: SourceFileView;
+	/**
+	 * Nest application model (spec 008), present when the scan target is a
+	 * Nest project. Rules query it for cross-file structure; findings are
+	 * still reported against `file` only.
+	 */
+	nest?: NestAppModel;
 	report(input: ReportInput): void;
 }
 
