@@ -1,6 +1,6 @@
 # Spec 013 — Graph rules: cycles & unused (F013)
 
-- **Status:** Approved (2026-09-20)
+- **Status:** Implemented (2026-09-20)
 - **Phase:** 3 — Project-level (opt-in, full scan)
 - **Depends on:** F003 (engine core: adapter, registry, runner, report) —
   Done; F004 (framework detection, package-root reading precedent) — Done;
@@ -20,6 +20,12 @@ canonical chain in each message; (3) entry heuristic is `package.json`
 reachability rules stay silent when no entry exists; (4) `unused-dependency`
 covers `dependencies` only (minus `@types/*` and non-registry protocols),
 with `scripts` mentions counting as usage; (5) no new dependencies.
+
+Implementation note (recorded at close-out, 2026-09-20): AC-3 additionally
+stays silent when the project has **no entry files** — without a known
+public-surface boundary every import-less export would be flagged, which
+is the same precision gate AC-2 already establishes. All AC-3 cases with
+entries present behave exactly as specified.
 
 ## Problem
 

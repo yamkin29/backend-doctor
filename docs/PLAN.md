@@ -74,7 +74,7 @@ projects[] }`.
 | F010 | Rules: layers & DTO | 2 | Done |
 | F011 | Rules: errors & lifecycle | 2 | Done |
 | F012 | Rules: Prisma | 2 | Done |
-| F013 | Graph rules (cycles, unused) | 3 | Planned |
+| F013 | Graph rules (cycles, unused) | 3 | Done |
 | F014 | Rules: config/env | 3 | Planned |
 | F015 | Diff scope (changed/files/lines) | 4 | Planned |
 | F016 | GitHub Action (`ci install`, PR comments) | 4 | Planned |

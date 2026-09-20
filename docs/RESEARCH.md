@@ -212,6 +212,39 @@ Under interop, a module **without** a default export exposes a *virtual*
 - Taken: `node-doctor` (env diagnostics CLI), `nest-doctor` (abandoned Nest helper).
 - `backend-doctor` is free — reserved for F023 publish.
 
+### Import-graph resolution (spec 013)
+
+- TypeScript sources written ESM-style import `./x.js` while the analyzed
+  file is `x.ts` (this repository's own convention). A relative specifier
+  must try, in order: the literal path; `.js→.ts`, `.mjs→.mts`,
+  `.cjs→.cts`; both forms with `/index` appended. Bare specifiers are
+  package imports, never graph edges.
+- Re-exports (`export … from`) and computed specifiers
+  (`` import(`./x/${name}`) ``) are not edges in the adapter's
+  `getModuleSpecifiers()` — documented recall hole for the graph pack.
+
+### ts-morph v28 (spec 013 additions)
+
+- `ImportSpecifier`/`ExportSpecifier` have **no alias accessor**
+  (`getPropertyNameNode` does not exist; the prototype carries only
+  `getName`/`getNameNode`/`setName`/`renameAlias`/…). `getName()` returns
+  the *source* name — `import { a as b }` → `"a"` (what usage detection
+  needs); for a local `export { a as b }` the exported alias `"b"` must be
+  derived from `getText()` (slice after the last `" as "`).
+- Span-free backtick strings are `NoSubstitutionTemplateLiteral`, not
+  `TemplateExpression` — only templates with at least one `${…}` parse as
+  the latter (see also the F012 note above).
+- A type-only two-way import between `registry.ts` and a rule-kind module
+  (`ProjectRuleContext` ↔ `ProjectRuleDefinition`) erases at compile time —
+  no runtime cycle.
+
+### New rule kinds touch config validation (spec 013)
+
+- The scan command validates config `rules`/`ignore.rules` ids against
+  `REGISTERED_RULE_IDS` (`src/cli/commands/scan.ts`). A new rule kind must
+  extend that set (`[...allRules(), ...allProjectRules()]`) or configs
+  naming its rules die with "unknown rule id (is it registered?)".
+
 ### react-doctor name-check facts (for future rule packs)
 
 - 802 active rules, 9 categories including a first-class Next.js pack (~23 rules)
