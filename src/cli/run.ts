@@ -7,6 +7,7 @@ import {
 	ciReportCommand,
 } from "./commands/ci.js";
 import { initCommand } from "./commands/init.js";
+import { rulesExplainCommand, rulesListCommand } from "./commands/rules.js";
 import { type ScanCommandOptions, scanCommand } from "./commands/scan.js";
 import { resolveVersion } from "./version.js";
 
@@ -86,6 +87,31 @@ export async function run(argv: string[]): Promise<number> {
 		.exitOverride()
 		.action(async () => {
 			exit = initCommand();
+		});
+
+	const rules = program
+		.command("rules")
+		.description("List and explain registered rules.");
+
+	rules
+		.command("list")
+		.description(
+			"Print every registered rule with category, severity and framework gate.",
+		)
+		.exitOverride()
+		.action(() => {
+			exit = rulesListCommand();
+		});
+
+	rules
+		.command("explain")
+		.description(
+			"Print one rule's metadata: title, category, severity, kind, framework gate, config key and doc path.",
+		)
+		.argument("<rule-id>", "full rule id, e.g. backend-doctor/no-eval")
+		.exitOverride()
+		.action((id: string) => {
+			exit = rulesExplainCommand(id);
 		});
 
 	const ci = program
