@@ -13,6 +13,7 @@ import { circularDi } from "./nest/circular-di.js";
 import { dtoFieldWithoutValidator } from "./nest/dto-field-without-validator.js";
 import { missingForwardRef } from "./nest/missing-forward-ref.js";
 import { missingGlobalValidationPipe } from "./nest/missing-global-validation-pipe.js";
+import { missingOnModuleDestroy } from "./nest/missing-on-module-destroy.js";
 import { noAnyInDto } from "./nest/no-any-in-dto.js";
 import { noBusinessLogicInController } from "./nest/no-business-logic-in-controller.js";
 import { noGodService } from "./nest/no-god-service.js";
@@ -52,6 +53,7 @@ const productRules = [
 	noUnsafeMerge,
 	noEmptyCatch,
 	noErrorDetailsLeak,
+	missingOnModuleDestroy,
 	providerNotRegistered,
 	circularDi,
 	missingForwardRef,
