@@ -1,5 +1,6 @@
 import { Command, CommanderError, Option } from "commander";
 import type { ReportFormat } from "../reporters/index.js";
+import { type CiInstallOptions, ciInstallCommand } from "./commands/ci.js";
 import { initCommand } from "./commands/init.js";
 import { type ScanCommandOptions, scanCommand } from "./commands/scan.js";
 import { resolveVersion } from "./version.js";
@@ -80,6 +81,24 @@ export async function run(argv: string[]): Promise<number> {
 		.exitOverride()
 		.action(async () => {
 			exit = initCommand();
+		});
+
+	const ci = program
+		.command("ci")
+		.description("CI integration helpers (GitHub Actions).");
+
+	ci.command("install")
+		.description(
+			"Write the Backend Doctor GitHub Actions workflow into the current repository.",
+		)
+		.option("--force", "overwrite an existing workflow file")
+		.option(
+			"--action-ref <ref>",
+			"the uses: ref baked into the generated workflow",
+		)
+		.exitOverride()
+		.action((opts: CiInstallOptions) => {
+			exit = ciInstallCommand(opts);
 		});
 
 	try {
