@@ -1,8 +1,13 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapter.js";
 import {
 	isConfigShapedPath,
 	isTestShapedPath,
 } from "../../../src/rules/config/config-paths.js";
+import { collectEnvAccesses } from "../../../src/rules/config/env-usage.js";
 import { isCoveredByGitignore } from "../../../src/rules/config/gitignore.js";
 
 describe("isConfigShapedPath (spec 014, design §2)", () => {
@@ -117,5 +122,68 @@ describe("isCoveredByGitignore (spec 014, design §5)", () => {
 
 	it("stays silent on empty coverage", () => {
 		expect(isCoveredByGitignore(".env", "")).toBe(false);
+	});
+});
+
+/** Parses a synthetic source and returns the census texts (async-calls.test.ts precedent). */
+function census(source: string): string[] {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "backend-doctor-env-"));
+	const filePath = path.join(dir, "sample.ts");
+	fs.writeFileSync(filePath, source);
+	try {
+		const adapter = new TsMorphParserAdapter();
+		const { files } = adapter.createProject([filePath]);
+		const view = files[0];
+		if (!view) throw new Error("sample file did not parse");
+		return collectEnvAccesses(view).map((node) => node.getText());
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+}
+
+describe("collectEnvAccesses (spec 014, design decision 2)", () => {
+	it("flags member and string-keyed element access", () => {
+		expect(
+			census(
+				'const a = process.env.PORT;\nconst b = process.env["API_KEY"];\n',
+			),
+		).toEqual(["process.env.PORT", 'process.env["API_KEY"]']);
+	});
+
+	it("flags optional-chaining access", () => {
+		expect(census("const a = process.env?.DEBUG;\n")).toEqual([
+			"process.env?.DEBUG",
+		]);
+	});
+
+	it("reports a chained access once, at its process.env.<first> anchor", () => {
+		expect(census("const a = process.env.FOO.BAR;\n")).toEqual([
+			"process.env.FOO",
+		]);
+		expect(census('const a = process.env["FOO"]["BAR"];\n')).toEqual([
+			'process.env["FOO"]',
+		]);
+	});
+
+	it("counts multiple accesses independently", () => {
+		expect(census("const a = process.env.A + process.env.B;\n")).toEqual([
+			"process.env.A",
+			"process.env.B",
+		]);
+	});
+
+	it("stays silent on whole-env reads and dynamic keys", () => {
+		expect(census("const vars = process.env;\n")).toEqual([]);
+		expect(census("const { PORT } = process.env;\n")).toEqual([]);
+		expect(census('const key = "A";\nconst a = process.env[key];\n')).toEqual(
+			[],
+		);
+	});
+
+	it("stays silent on lookalikes", () => {
+		expect(census("const a = ctx.process.env.A;\n")).toEqual([]);
+		expect(census("const a = process.envirs.A;\n")).toEqual([]);
+		expect(census("const a = globalThis.process.env.A;\n")).toEqual([]);
+		expect(census("const a = local.env.A;\n")).toEqual([]);
 	});
 });
