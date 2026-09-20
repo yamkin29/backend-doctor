@@ -12,6 +12,7 @@ import {
 import type {
 	NestAppModel,
 	NestControllerEntry,
+	NestDtoEntry,
 	NestHandlerEntry,
 	NestHttpVerb,
 	NestModuleEntry,
@@ -37,6 +38,16 @@ const VERB_DECORATORS = new Set([
 	"All",
 ]);
 
+const DTO_DECORATORS = new Set([
+	"InputType",
+	"ArgsType",
+	"ObjectType",
+	"PartialType",
+	"PickType",
+	"OmitType",
+	"IntersectionType",
+]);
+
 /**
  * Extracts the Nest application model (spec 008). Decorator-derived entries
  * come only from files referencing a `@nestjs/` specifier (same prefix style
@@ -51,29 +62,36 @@ export function extractNestAppModel(
 	const modules: NestModuleEntry[] = [];
 	const controllers: NestControllerEntry[] = [];
 	const providers: NestProviderEntry[] = [];
+	const dtos: NestDtoEntry[] = [];
 
 	for (const file of files) {
-		if (!referencesNest(file)) continue;
+		// Suffix DTOs are gate-exempt (a plain *.dto.ts usually has no @nestjs
+		// import); decorator-derived entries below all require the gate.
+		const gated = referencesNest(file);
 		file.forEachDescendant((node) => {
 			const cls = node.asKind(SyntaxKind.ClassDeclaration);
 			if (!cls) return undefined;
 			const className = cls.getName();
 			if (!className) return undefined; // anonymous classes cannot be referenced by name
-			const moduleDecorator = findClassDecorator(cls, "Module");
-			if (moduleDecorator) {
-				modules.push(
-					readModule(cls, className, moduleDecorator, file, adapter),
-				);
+			if (gated) {
+				const moduleDecorator = findClassDecorator(cls, "Module");
+				if (moduleDecorator) {
+					modules.push(
+						readModule(cls, className, moduleDecorator, file, adapter),
+					);
+				}
+				const controllerDecorator = findClassDecorator(cls, "Controller");
+				if (controllerDecorator) {
+					controllers.push(
+						readController(cls, className, controllerDecorator, file, adapter),
+					);
+				}
+				if (findClassDecorator(cls, "Injectable")) {
+					providers.push(nodeEntry(cls, className, file, adapter));
+				}
 			}
-			const controllerDecorator = findClassDecorator(cls, "Controller");
-			if (controllerDecorator) {
-				controllers.push(
-					readController(cls, className, controllerDecorator, file, adapter),
-				);
-			}
-			if (findClassDecorator(cls, "Injectable")) {
-				providers.push(nodeEntry(cls, className, file, adapter));
-			}
+			const via = recognizeDto(cls, className);
+			if (via) dtos.push({ ...nodeEntry(cls, className, file, adapter), via });
 			return undefined;
 		});
 	}
@@ -81,13 +99,8 @@ export function extractNestAppModel(
 	modules.sort(compareEntries);
 	controllers.sort(compareEntries);
 	providers.sort(compareEntries);
-	return {
-		modules,
-		controllers,
-		providers,
-		dtos: [],
-		unresolved: [],
-	};
+	dtos.sort(compareEntries);
+	return { modules, controllers, providers, dtos, unresolved: [] };
 }
 
 function referencesNest(file: SourceFileView): boolean {
@@ -166,6 +179,19 @@ function nodeEntry(
 		line: position.line,
 		column: position.column,
 	};
+}
+
+/** Suffix first (`Dto`/`DTO` exact), then the pinned decorator list. */
+function recognizeDto(
+	cls: ClassDeclaration,
+	className: string,
+): "suffix" | "decorator" | null {
+	if (className.endsWith("Dto") || className.endsWith("DTO")) return "suffix";
+	for (const decorator of cls.getDecorators()) {
+		const name = decoratorName(decorator);
+		if (name && DTO_DECORATORS.has(name)) return "decorator";
+	}
+	return null;
 }
 
 function readController(

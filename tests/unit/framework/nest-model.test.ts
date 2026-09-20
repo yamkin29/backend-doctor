@@ -120,3 +120,32 @@ describe("nest model: providers (AC-3)", () => {
 		]);
 	});
 });
+
+describe("nest model: dtos (AC-4)", () => {
+	it("extracts suffix and decorator DTOs with the matching via (AC-4)", () => {
+		const { dtos } = extractModel();
+		expect(dtos).toEqual([
+			{
+				filePath: path.join(APP_ROOT, "users", "create-user.dto.ts"),
+				className: "CreateUserDto",
+				line: 1,
+				column: 1,
+				via: "suffix",
+			},
+			{
+				filePath: path.join(APP_ROOT, "users", "user.dto.ts"),
+				className: "UserFilter",
+				line: 3,
+				column: 1,
+				via: "decorator",
+			},
+		]);
+	});
+
+	it("keeps non-DTO classes out (AC-4)", () => {
+		const { dtos } = extractModel();
+		const classNames = dtos.map((d) => d.className);
+		expect(classNames).not.toContain("UserEntity");
+		expect(classNames).not.toContain("UsersService");
+	});
+});
