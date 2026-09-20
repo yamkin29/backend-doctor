@@ -10,6 +10,7 @@ import { noSyncFsInRequestPath } from "./blocking/sync-fs.js";
 import { circularDi } from "./nest/circular-di.js";
 import { missingForwardRef } from "./nest/missing-forward-ref.js";
 import { providerNotRegistered } from "./nest/provider-not-registered.js";
+import { requestScopedInSingleton } from "./nest/request-scoped-in-singleton.js";
 import { noCommandInjection } from "./security/no-command-injection.js";
 import { noEval } from "./security/no-eval.js";
 import { noHardcodedSecrets } from "./security/no-hardcoded-secrets.js";
@@ -44,6 +45,7 @@ const productRules = [
 	providerNotRegistered,
 	circularDi,
 	missingForwardRef,
+	requestScopedInSingleton,
 ];
 
 for (const rule of productRules) {

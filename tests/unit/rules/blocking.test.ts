@@ -236,10 +236,11 @@ describe("product registry (AC-13, spec 007)", () => {
 			"backend-doctor/provider-not-registered",
 			"backend-doctor/circular-di",
 			"backend-doctor/missing-forward-ref",
+			"backend-doctor/request-scoped-in-singleton",
 		]) {
 			expect(ids, id).toContain(id);
 		}
-		expect(ids).toHaveLength(19);
+		expect(ids).toHaveLength(20);
 		expect(new Set(ids).size).toBe(ids.length);
 	});
 });

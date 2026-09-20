@@ -14,6 +14,7 @@ import { extractNestAppModel } from "../../../src/framework/nest/extract.js";
 import { circularDi } from "../../../src/rules/nest/circular-di.js";
 import { missingForwardRef } from "../../../src/rules/nest/missing-forward-ref.js";
 import { providerNotRegistered } from "../../../src/rules/nest/provider-not-registered.js";
+import { requestScopedInSingleton } from "../../../src/rules/nest/request-scoped-in-singleton.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const FIXTURE_ROOT = path.resolve(
@@ -206,6 +207,68 @@ describe("backend-doctor/missing-forward-ref (AC-9, AC-14)", () => {
 				path.join(
 					REPO_ROOT,
 					"docs/rules/backend-doctor/missing-forward-ref.md",
+				),
+			),
+		).toBe(true);
+	});
+});
+
+describe("backend-doctor/request-scoped-in-singleton (AC-10, AC-14)", () => {
+	const rule = requestScopedInSingleton;
+	const message = (provider: string, consumer: string) =>
+		`${provider} is request-scoped; injecting it into the singleton ${consumer} makes ${consumer} and its subtree rebuild on every request. Keep request state out of DI scope (pass it per call) or accept the per-request cost explicitly.`;
+
+	it("flags request-scoped providers injected into singletons (AC-10)", () => {
+		expect(
+			summarize(scanNestFixture(rule, "request-scoped-in-singleton/invalid")),
+		).toEqual([
+			{
+				file: path.join(
+					"request-scoped-in-singleton",
+					"invalid",
+					"orders.controller.ts",
+				),
+				line: 6,
+				column: 14,
+				message: message("RequestContext", "OrdersController"),
+				severity: "warn",
+				category: "Performance",
+			},
+			{
+				file: path.join(
+					"request-scoped-in-singleton",
+					"invalid",
+					"orders.service.ts",
+				),
+				line: 6,
+				column: 14,
+				message: message("RequestContext", "OrdersService"),
+				severity: "warn",
+				category: "Performance",
+			},
+		]);
+	});
+
+	it("stays silent for request-scoped, transient and plain consumers (AC-10)", () => {
+		expect(scanNestFixture(rule, "request-scoped-in-singleton/valid")).toEqual(
+			[],
+		);
+	});
+
+	it("ships valid/invalid fixtures and a rule doc (AC-14)", () => {
+		for (const dir of ["valid", "invalid"]) {
+			expect(
+				fs.existsSync(
+					path.join(FIXTURE_ROOT, "request-scoped-in-singleton", dir),
+				),
+				dir,
+			).toBe(true);
+		}
+		expect(
+			fs.existsSync(
+				path.join(
+					REPO_ROOT,
+					"docs/rules/backend-doctor/request-scoped-in-singleton.md",
 				),
 			),
 		).toBe(true);
