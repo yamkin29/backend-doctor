@@ -11,7 +11,9 @@ const FIXTURE_ROOT = path.resolve(import.meta.dirname, "../../fixtures/nest");
 const APP_ROOT = path.join(FIXTURE_ROOT, "model-app");
 
 /** Runs the real extractor over the committed fixture app. */
-function extractModel(): ReturnType<typeof extractNestAppModel> {
+function extractModel(
+	reverseFiles = false,
+): ReturnType<typeof extractNestAppModel> {
 	const paths = collectFiles({
 		target: APP_ROOT,
 		extensions: SUPPORTED_EXTENSIONS,
@@ -20,7 +22,10 @@ function extractModel(): ReturnType<typeof extractNestAppModel> {
 	});
 	const adapter = new TsMorphParserAdapter();
 	const { files } = adapter.createProject(paths);
-	return extractNestAppModel(files, adapter);
+	return extractNestAppModel(
+		reverseFiles ? [...files].reverse() : files,
+		adapter,
+	);
 }
 
 describe("nest model: modules (AC-1, AC-6)", () => {
@@ -189,5 +194,24 @@ describe("nest model: unresolved references (AC-5)", () => {
 					"object literal element in providers array without a readable class reference",
 			},
 		]);
+	});
+});
+
+describe("nest model: determinism and empty model (AC-8, AC-10)", () => {
+	it("produces an all-empty model for an empty file set (AC-10)", () => {
+		const adapter = new TsMorphParserAdapter();
+		expect(extractNestAppModel([], adapter)).toEqual({
+			modules: [],
+			controllers: [],
+			providers: [],
+			dtos: [],
+			unresolved: [],
+		});
+	});
+
+	it("is independent of the input file order and stable across runs (AC-8)", () => {
+		const sorted = extractModel();
+		const reversed = extractModel(true);
+		expect(reversed).toEqual(sorted);
 	});
 });
