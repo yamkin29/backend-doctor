@@ -1,9 +1,11 @@
 import fs from "node:fs";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_ACTION_REF } from "../../src/ci/workflow-template.js";
-import { expectSuccess, makeTmpDir, runCli } from "./helpers.js";
+import { expectSuccess, makeTmpDir, runCli, runCliAsync } from "./helpers.js";
 
 const WORKFLOW_REL = path.join(".github", "workflows", "backend-doctor.yml");
 
@@ -419,4 +421,174 @@ describe("ci report — dry run (AC-5..AC-11, AC-14)", () => {
 		expect(result.exitCode).toBe(2);
 		expect(result.stderr).toContain("--max-review-comments");
 	});
+});
+
+describe("ci report — posting path (AC-12)", () => {
+	let tmp: string;
+	beforeEach(() => {
+		tmp = makeTmpDir();
+	});
+	afterEach(() => {
+		fs.rmSync(tmp, { recursive: true, force: true });
+	});
+
+	const PR_EVENT = {
+		number: 7,
+		pull_request: { number: 7, base: { ref: "main" }, head: { sha: "abc123" } },
+	};
+
+	function writeFixtures(): { reportFile: string; eventFile: string } {
+		const reportFile = path.join(tmp, "report.json");
+		fs.writeFileSync(
+			reportFile,
+			JSON.stringify({
+				schemaVersion: 1,
+				mode: "lines",
+				scope: { base: "origin/main" },
+				directory: tmp,
+				diagnostics: [
+					{
+						id: "d1",
+						filePath: path.join(tmp, "src/a.ts"),
+						line: 3,
+						column: 1,
+						rule: "backend-doctor/no-eval",
+						category: "Security",
+						severity: "error",
+						message: "eval usage",
+						tags: [],
+					},
+				],
+				projects: [],
+			}),
+		);
+		const eventFile = path.join(tmp, "event.json");
+		fs.writeFileSync(eventFile, JSON.stringify(PR_EVENT));
+		return { reportFile, eventFile };
+	}
+
+	function runReport(
+		reportFile: string,
+		eventFile: string,
+		apiUrl: string,
+		extraArgs: string[] = [],
+	): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+		return runCliAsync(
+			[
+				"ci",
+				"report",
+				"--report",
+				reportFile,
+				"--event",
+				eventFile,
+				...extraArgs,
+			],
+			{
+				cwd: tmp,
+				env: {
+					GITHUB_REPOSITORY: "acme/widgets",
+					GITHUB_EVENT_NAME: "",
+					GITHUB_EVENT_PATH: "",
+					GITHUB_API_URL: apiUrl,
+					GITHUB_TOKEN: "t0k3n",
+				},
+			},
+		);
+	}
+
+	it("posts every surface against a live local API (AC-12 happy path)", async () => {
+		const calls: Array<{ method: string; url: string }> = [];
+		const server = http.createServer((req, res) => {
+			req.resume();
+			req.on("end", () => {
+				calls.push({ method: req.method ?? "", url: req.url ?? "" });
+				res.writeHead(201, { "content-type": "application/json" });
+				res.end(req.method === "GET" ? "[]" : "{}");
+			});
+		});
+		await new Promise<void>((resolve) =>
+			server.listen(0, "127.0.0.1", resolve),
+		);
+		const port = (server.address() as AddressInfo).port;
+		try {
+			const { reportFile, eventFile } = writeFixtures();
+			const result = await runReport(
+				reportFile,
+				eventFile,
+				`http://127.0.0.1:${port}`,
+			);
+			expectSuccess(result);
+			expect(result.stdout).toBe("");
+			expect(
+				calls.some(
+					(c) =>
+						c.method === "GET" &&
+						c.url.startsWith("/repos/acme/widgets/issues/7/comments"),
+				),
+			).toBe(true);
+			expect(
+				calls.some(
+					(c) =>
+						c.method === "POST" &&
+						c.url === "/repos/acme/widgets/issues/7/comments",
+				),
+			).toBe(true);
+			expect(
+				calls.some(
+					(c) =>
+						c.method === "POST" &&
+						c.url === "/repos/acme/widgets/pulls/7/comments",
+				),
+			).toBe(true);
+			expect(
+				calls.some(
+					(c) =>
+						c.method === "POST" &&
+						c.url === "/repos/acme/widgets/statuses/abc123",
+				),
+			).toBe(true);
+		} finally {
+			server.close();
+			server.closeAllConnections();
+		}
+	}, 20000);
+
+	it("warns per surface when the API rejects everything, exit per blocking (AC-12)", async () => {
+		const server = http.createServer((req, res) => {
+			req.resume();
+			req.on("end", () => {
+				res.writeHead(500, { "content-type": "application/json" });
+				res.end("{}");
+			});
+		});
+		await new Promise<void>((resolve) =>
+			server.listen(0, "127.0.0.1", resolve),
+		);
+		const port = (server.address() as AddressInfo).port;
+		try {
+			const { reportFile, eventFile } = writeFixtures();
+			const advisory = await runReport(
+				reportFile,
+				eventFile,
+				`http://127.0.0.1:${port}`,
+			);
+			expect(advisory.exitCode).toBe(0);
+			expect(advisory.stderr).toContain("sticky comment skipped: HTTP 500");
+			expect(advisory.stderr).toContain(
+				"inline review comments skipped: HTTP 500 after 0 posted",
+			);
+			expect(advisory.stderr).toContain("commit status skipped: HTTP 500");
+
+			const blocking = await runReport(
+				reportFile,
+				eventFile,
+				`http://127.0.0.1:${port}`,
+				["--blocking", "error"],
+			);
+			expect(blocking.exitCode).toBe(1);
+		} finally {
+			server.close();
+			server.closeAllConnections();
+		}
+	}, 20000);
 });
