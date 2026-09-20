@@ -14,6 +14,7 @@ import type {
 } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { envWithoutValidation } from "../../../src/rules/config/env-without-validation.js";
+import { noCommittedEnv } from "../../../src/rules/config/no-committed-env.js";
 import { noDirectProcessEnv } from "../../../src/rules/config/no-direct-process-env.js";
 
 const FIXTURE_ROOT = path.resolve(import.meta.dirname, "../../fixtures/config");
@@ -170,6 +171,61 @@ describe("backend-doctor/env-without-validation (AC-2)", () => {
 				envWithoutValidation,
 				"env-without-validation/valid-no-env",
 			),
+		).toEqual([]);
+	});
+});
+
+function committedEnvMessage(name: string): string {
+	return `${name} exists at the package root and is not covered by .gitignore; dotenv files carry real credentials and end up committed by accident. Add it to .gitignore, rotate any credential it ever held, and keep a committed .env.example instead.`;
+}
+
+describe("backend-doctor/no-committed-env (AC-3)", () => {
+	it("flags uncovered dotenv candidates at the package root", () => {
+		expect(
+			summarize(scanProjectFixture(noCommittedEnv, "no-committed-env/invalid")),
+		).toEqual([
+			{
+				file: path.join("no-committed-env", "invalid", ".env"),
+				line: 1,
+				column: 1,
+				message: committedEnvMessage(".env"),
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-committed-env", "invalid", ".env.local"),
+				line: 1,
+				column: 1,
+				message: committedEnvMessage(".env.local"),
+				severity: "warn",
+				category: "Security",
+			},
+		]);
+	});
+
+	it("flags dotenv files when no .gitignore exists", () => {
+		expect(
+			summarize(
+				scanProjectFixture(
+					noCommittedEnv,
+					"no-committed-env/invalid-no-gitignore",
+				),
+			),
+		).toEqual([
+			{
+				file: path.join("no-committed-env", "invalid-no-gitignore", ".env"),
+				line: 1,
+				column: 1,
+				message: committedEnvMessage(".env"),
+				severity: "warn",
+				category: "Security",
+			},
+		]);
+	});
+
+	it("stays silent when .gitignore covers the candidates", () => {
+		expect(
+			scanProjectFixture(noCommittedEnv, "no-committed-env/valid"),
 		).toEqual([]);
 	});
 });

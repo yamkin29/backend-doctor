@@ -8,6 +8,7 @@ import { noCpuBoundLoop } from "./blocking/cpu-bound-loop.js";
 import { noSyncCrypto } from "./blocking/sync-crypto.js";
 import { noSyncFsInRequestPath } from "./blocking/sync-fs.js";
 import { envWithoutValidation } from "./config/env-without-validation.js";
+import { noCommittedEnv } from "./config/no-committed-env.js";
 import { noDirectProcessEnv } from "./config/no-direct-process-env.js";
 import { noEmptyCatch } from "./errors/no-empty-catch.js";
 import { noErrorDetailsLeak } from "./errors/no-error-details-leak.js";
@@ -89,6 +90,7 @@ const productProjectRules = [
 	unusedExport,
 	unusedFile,
 	envWithoutValidation,
+	noCommittedEnv,
 ];
 
 for (const rule of productRules) {
