@@ -28,6 +28,12 @@ export interface SurfaceOptions {
 	commitStatus: boolean;
 	maxReviewComments: number;
 	context: PullRequestContext;
+	/**
+	 * $GITHUB_WORKSPACE when running in Actions: the base review-comment
+	 * paths are relativized against (the API rejects absolute paths).
+	 * Falls back to the report's `directory` when unset.
+	 */
+	workspaceRoot?: string;
 }
 
 /** A POST /pulls/{n}/comments body, exactly as sent to the API. */
