@@ -1,17 +1,22 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import type { ResolvedConfig } from "../../../src/config/types.js";
 import { defaultConfig } from "../../../src/config/types.js";
-import type { Diagnostic } from "../../../src/core/types.js";
+import type { Diagnostic, SkippedCheck } from "../../../src/core/types.js";
 import {
 	collectFiles,
 	SUPPORTED_EXTENSIONS,
 } from "../../../src/engine/collect.js";
 import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapter.js";
-import { runProjectRules } from "../../../src/engine/project-rules.js";
+import {
+	type RunProjectRulesOptions,
+	runProjectRules,
+} from "../../../src/engine/project-rules.js";
 import type {
 	ProjectRuleDefinition,
 	RuleDefinition,
 } from "../../../src/engine/registry.js";
+import { defineProjectRule, defineRule } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { envWithoutValidation } from "../../../src/rules/config/env-without-validation.js";
 import { noCommittedEnv } from "../../../src/rules/config/no-committed-env.js";
@@ -31,10 +36,17 @@ const rules: Record<string, RuleDefinition> = {
 	"no-direct-process-env": noDirectProcessEnv,
 };
 
-/** Runs one file rule over a fixture directory using the real parser adapter. */
-function scanFixture(shortId: string, fixtureName: string): Diagnostic[] {
-	const rule = rules[shortId];
-	if (!rule) throw new Error(`no rule registered for "${shortId}"`);
+interface FixtureOutcome {
+	diagnostics: Diagnostic[];
+	skippedChecks: SkippedCheck[];
+}
+
+/** Runs file rules over a fixture directory using the real parser adapter. */
+function runOverFixture(
+	ruleDefs: readonly RuleDefinition[],
+	fixtureName: string,
+	config: ResolvedConfig = defaultConfig(),
+): FixtureOutcome {
 	const target = path.join(FIXTURE_ROOT, fixtureName);
 	const files = collectFiles({
 		target,
@@ -45,20 +57,27 @@ function scanFixture(shortId: string, fixtureName: string): Diagnostic[] {
 	const adapter = new TsMorphParserAdapter();
 	const { files: views } = adapter.createProject(files);
 
-	const diagnostics: Diagnostic[] = [];
+	const outcome: FixtureOutcome = { diagnostics: [], skippedChecks: [] };
 	for (const view of views) {
-		diagnostics.push(
-			...runRules({
-				file: view,
-				rules: [rule],
-				config: defaultConfig(),
-				adapter,
-				scanRoot: target,
-				detectedFrameworks: [],
-			}).diagnostics,
-		);
+		const result = runRules({
+			file: view,
+			rules: ruleDefs,
+			config,
+			adapter,
+			scanRoot: target,
+			detectedFrameworks: [],
+		});
+		outcome.diagnostics.push(...result.diagnostics);
+		outcome.skippedChecks.push(...result.skippedChecks);
 	}
-	return diagnostics;
+	return outcome;
+}
+
+/** Runs one file rule over a fixture directory (diagnostics only). */
+function scanFixture(shortId: string, fixtureName: string): Diagnostic[] {
+	const rule = rules[shortId];
+	if (!rule) throw new Error(`no rule registered for "${shortId}"`);
+	return runOverFixture([rule], fixtureName).diagnostics;
 }
 
 function summarize(diagnostics: Diagnostic[]) {
@@ -105,11 +124,12 @@ describe("backend-doctor/no-direct-process-env (AC-1)", () => {
 	});
 });
 
-/** Runs one project rule over a multi-file fixture tree (graph.test.ts precedent). */
-function scanProjectFixture(
-	rule: ProjectRuleDefinition,
+/** Runs project rules over a multi-file fixture tree (graph.test.ts precedent). */
+function runProjectOverFixture(
+	ruleDefs: readonly ProjectRuleDefinition[],
 	fixtureName: string,
-): Diagnostic[] {
+	config: ResolvedConfig = defaultConfig(),
+): FixtureOutcome {
 	const target = path.join(FIXTURE_ROOT, fixtureName);
 	const paths = collectFiles({
 		target,
@@ -119,15 +139,24 @@ function scanProjectFixture(
 	});
 	const adapter = new TsMorphParserAdapter();
 	const { files } = adapter.createProject(paths);
-	return runProjectRules({
+	const options: RunProjectRulesOptions = {
 		files,
-		rules: [rule],
-		config: defaultConfig(),
+		rules: ruleDefs,
+		config,
 		adapter,
 		scanRoot: target,
 		detectedFrameworks: [],
 		packageRoot: target,
-	}).diagnostics;
+	};
+	return runProjectRules(options);
+}
+
+/** Runs one project rule over a fixture tree (diagnostics only). */
+function scanProjectFixture(
+	rule: ProjectRuleDefinition,
+	fixtureName: string,
+): Diagnostic[] {
+	return runProjectOverFixture([rule], fixtureName).diagnostics;
 }
 
 describe("backend-doctor/env-without-validation (AC-2)", () => {
@@ -227,5 +256,98 @@ describe("backend-doctor/no-committed-env (AC-3)", () => {
 		expect(
 			scanProjectFixture(noCommittedEnv, "no-committed-env/valid"),
 		).toEqual([]);
+	});
+});
+
+const boomFileRule = defineRule({
+	id: "backend-doctor/test/boom-file",
+	title: "Boom (file)",
+	category: "Bugs",
+	severity: "warn",
+	docs: "docs/rules/backend-doctor/no-direct-process-env.md",
+	create() {
+		throw new Error("boom file");
+	},
+});
+
+const boomProjectRule = defineProjectRule({
+	id: "backend-doctor/test/boom-project",
+	title: "Boom (project)",
+	category: "Bugs",
+	severity: "warn",
+	docs: "docs/rules/backend-doctor/no-committed-env.md",
+	analyze() {
+		throw new Error("boom project");
+	},
+});
+
+describe("config pack fail-soft + config matrix (AC-4, AC-5)", () => {
+	it("isolates a crashing file rule and keeps pack findings (AC-4)", () => {
+		const outcome = runOverFixture(
+			[boomFileRule, noDirectProcessEnv],
+			"no-direct-process-env/invalid",
+		);
+		const internal = outcome.diagnostics.find(
+			(d) => d.rule === boomFileRule.id,
+		);
+		expect(internal?.tags).toEqual(["internal"]);
+		expect(internal?.line).toBe(1);
+		expect(internal?.column).toBe(1);
+		expect(outcome.skippedChecks.map((entry) => entry.check)).toContain(
+			boomFileRule.id,
+		);
+		expect(
+			outcome.diagnostics.filter((d) => d.rule === noDirectProcessEnv.id),
+		).toHaveLength(2);
+	});
+
+	it("isolates a crashing project rule and keeps pack findings (AC-4)", () => {
+		const outcome = runProjectOverFixture(
+			[boomProjectRule, noCommittedEnv],
+			"no-committed-env/invalid",
+		);
+		const internal = outcome.diagnostics.find(
+			(d) => d.rule === boomProjectRule.id,
+		);
+		expect(internal?.tags).toEqual(["internal"]);
+		expect(outcome.skippedChecks.map((entry) => entry.check)).toContain(
+			boomProjectRule.id,
+		);
+		expect(
+			outcome.diagnostics.filter((d) => d.rule === noCommittedEnv.id),
+		).toHaveLength(2);
+	});
+
+	it("silences a pack rule via ignore.rules and severity off (AC-5)", () => {
+		const ignored = defaultConfig();
+		ignored.ignore.rules.push(noDirectProcessEnv.id);
+		expect(
+			runOverFixture(
+				[noDirectProcessEnv],
+				"no-direct-process-env/invalid",
+				ignored,
+			).diagnostics,
+		).toEqual([]);
+
+		const off = defaultConfig();
+		off.rules[noDirectProcessEnv.id] = "off";
+		expect(
+			runOverFixture([noDirectProcessEnv], "no-direct-process-env/invalid", off)
+				.diagnostics,
+		).toEqual([]);
+	});
+
+	it("escalates a pack rule to error via the standard matrix (AC-5)", () => {
+		const escalated = defaultConfig();
+		escalated.rules[noDirectProcessEnv.id] = "error";
+		const diagnostics = runOverFixture(
+			[noDirectProcessEnv],
+			"no-direct-process-env/invalid",
+			escalated,
+		).diagnostics;
+		expect(diagnostics.length).toBe(2);
+		for (const diagnostic of diagnostics) {
+			expect(diagnostic.severity).toBe("error");
+		}
 	});
 });
