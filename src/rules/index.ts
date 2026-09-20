@@ -1,4 +1,4 @@
-import { registerRule } from "../engine/registry.js";
+import { registerProjectRule, registerRule } from "../engine/registry.js";
 import { noAsyncConstructorWork } from "./async/no-async-constructor-work.js";
 import { noAsyncForeachCallback } from "./async/no-async-foreach-callback.js";
 import { noFloatingPromises } from "./async/no-floating-promises.js";
@@ -9,6 +9,7 @@ import { noSyncCrypto } from "./blocking/sync-crypto.js";
 import { noSyncFsInRequestPath } from "./blocking/sync-fs.js";
 import { noEmptyCatch } from "./errors/no-empty-catch.js";
 import { noErrorDetailsLeak } from "./errors/no-error-details-leak.js";
+import { circularDependency } from "./graph/circular-dependency.js";
 import { circularDi } from "./nest/circular-di.js";
 import { dtoFieldWithoutValidator } from "./nest/dto-field-without-validator.js";
 import { missingForwardRef } from "./nest/missing-forward-ref.js";
@@ -76,6 +77,11 @@ const productRules = [
 	noUnsafeRawQuery,
 ];
 
+const productProjectRules = [circularDependency];
+
 for (const rule of productRules) {
 	registerRule(rule);
+}
+for (const rule of productProjectRules) {
+	registerProjectRule(rule);
 }

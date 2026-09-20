@@ -7,7 +7,11 @@ import {
 	SUPPORTED_EXTENSIONS,
 } from "../../../src/engine/collect.js";
 import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapter.js";
-import { allRules, type RuleDefinition } from "../../../src/engine/registry.js";
+import {
+	allProjectRules,
+	allRules,
+	type RuleDefinition,
+} from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { noCpuBoundLoop } from "../../../src/rules/blocking/cpu-bound-loop.js";
 import { noSyncCrypto } from "../../../src/rules/blocking/sync-crypto.js";
@@ -215,7 +219,7 @@ describe("backend-doctor/no-cpu-bound-loop (AC-7..8)", () => {
 
 describe("product registry (AC-13, spec 007)", () => {
 	it("registers all product rules across the async, blocking and security packs", () => {
-		const ids = allRules().map((rule) => rule.id);
+		const ids = [...allRules(), ...allProjectRules()].map((rule) => rule.id);
 		for (const id of [
 			"backend-doctor/no-sync-fs-in-request-path",
 			"backend-doctor/no-sync-crypto",
@@ -240,7 +244,7 @@ describe("product registry (AC-13, spec 007)", () => {
 		]) {
 			expect(ids, id).toContain(id);
 		}
-		expect(ids).toHaveLength(34);
+		expect(ids).toHaveLength(35);
 		expect(new Set(ids).size).toBe(ids.length);
 	});
 });

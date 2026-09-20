@@ -45,6 +45,8 @@ export interface ProjectRuleContext {
 	readonly dependencies: readonly string[];
 	/** package.json `scripts` command strings. */
 	readonly scripts: readonly string[];
+	/** Target-relative posix form of an absolute path (messages, chains). */
+	relativePath(filePath: string): string;
 	positionOf(file: SourceFileView, node: Node): SourceFilePosition;
 	report(input: ProjectReportInput): void;
 }
@@ -106,6 +108,7 @@ export function runProjectRules(
 			entries,
 			dependencies: surface.dependencies,
 			scripts: surface.scripts,
+			relativePath: (filePath) => relativeTo(opts.scanRoot, filePath),
 			positionOf: (file, node) =>
 				opts.adapter.positionOf(file, node.getStart()),
 			report: (input) => findings.push(input),
