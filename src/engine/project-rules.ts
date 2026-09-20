@@ -41,10 +41,12 @@ export interface ProjectRuleContext {
 	readonly graph: ImportGraph;
 	/** Entry files (may be empty — reachability rules stay silent then). */
 	readonly entries: string[];
-	/** package.json `dependencies` keys (no devDependencies). */
-	readonly dependencies: readonly string[];
+	/** package.json `dependencies` (name → spec, sorted; no devDependencies). */
+	readonly dependencies: Readonly<Record<string, string>>;
 	/** package.json `scripts` command strings. */
 	readonly scripts: readonly string[];
+	/** The package root the scan target belongs to (fallback: scan target). */
+	readonly packageRoot: string;
 	/** Target-relative posix form of an absolute path (messages, chains). */
 	relativePath(filePath: string): string;
 	positionOf(file: SourceFileView, node: Node): SourceFilePosition;
@@ -108,6 +110,7 @@ export function runProjectRules(
 			entries,
 			dependencies: surface.dependencies,
 			scripts: surface.scripts,
+			packageRoot: opts.packageRoot,
 			relativePath: (filePath) => relativeTo(opts.scanRoot, filePath),
 			positionOf: (file, node) =>
 				opts.adapter.positionOf(file, node.getStart()),
@@ -176,7 +179,7 @@ export function runProjectRules(
  * broken one is reported instead of failing the scan (constitution §8).
  */
 export function readPackageJsonSurface(packageRoot: string): {
-	dependencies: string[];
+	dependencies: Record<string, string>;
 	scripts: string[];
 	main?: string;
 	bin?: string | Record<string, string>;
@@ -184,7 +187,7 @@ export function readPackageJsonSurface(packageRoot: string): {
 } {
 	const filePath = path.join(packageRoot, "package.json");
 	if (!fs.existsSync(filePath)) {
-		return { dependencies: [], scripts: [] };
+		return { dependencies: {}, scripts: [] };
 	}
 
 	let content: string;
@@ -192,7 +195,7 @@ export function readPackageJsonSurface(packageRoot: string): {
 		content = fs.readFileSync(filePath, "utf8");
 	} catch (error) {
 		return {
-			dependencies: [],
+			dependencies: {},
 			scripts: [],
 			failure: failureEntry(
 				filePath,
@@ -206,7 +209,7 @@ export function readPackageJsonSurface(packageRoot: string): {
 		parsed = JSON.parse(content);
 	} catch (error) {
 		return {
-			dependencies: [],
+			dependencies: {},
 			scripts: [],
 			failure: failureEntry(
 				filePath,
@@ -216,15 +219,19 @@ export function readPackageJsonSurface(packageRoot: string): {
 	}
 	if (!isPlainObject(parsed)) {
 		return {
-			dependencies: [],
+			dependencies: {},
 			scripts: [],
 			failure: failureEntry(filePath, "root must be an object"),
 		};
 	}
 
 	const dependencies = isPlainObject(parsed.dependencies)
-		? Object.keys(parsed.dependencies).sort()
-		: [];
+		? (Object.fromEntries(
+				Object.entries(parsed.dependencies)
+					.filter(([, value]) => typeof value === "string")
+					.sort(([a], [b]) => (a < b ? -1 : 1)),
+			) as Record<string, string>)
+		: {};
 	const scripts = isPlainObject(parsed.scripts)
 		? Object.values(parsed.scripts).filter(
 				(value): value is string => typeof value === "string",

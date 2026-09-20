@@ -1,0 +1,11 @@
+{
+  "name": "app",
+  "scripts": { "db": "prisma migrate dev" },
+  "dependencies": {
+    "@types/node": "^20.0.0",
+    "express": "^4.0.0",
+    "my-workspace-pkg": "workspace:^1.0.0",
+    "prisma": "^5.0.0"
+  },
+  "devDependencies": { "vitest": "^3.0.0" }
+}

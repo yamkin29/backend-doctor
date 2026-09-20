@@ -224,7 +224,10 @@ describe("readPackageJsonSurface", () => {
 			}),
 		);
 		const surface = readPackageJsonSurface(root);
-		expect(surface.dependencies).toEqual(["@prisma/client", "express"]);
+		expect(surface.dependencies).toEqual({
+			"@prisma/client": "^5.0.0",
+			express: "^4.0.0",
+		});
 		expect(surface.scripts).toEqual(["node dist/main.js", "biome check ."]);
 		expect(surface.main).toBeUndefined();
 		expect(surface.failure).toBeUndefined();
@@ -233,7 +236,7 @@ describe("readPackageJsonSurface", () => {
 	it("treats a missing package.json as an empty surface", () => {
 		const root = fs.mkdtempSync(path.join(os.tmpdir(), "backend-doctor-pj-"));
 		const surface = readPackageJsonSurface(root);
-		expect(surface.dependencies).toEqual([]);
+		expect(surface.dependencies).toEqual({});
 		expect(surface.scripts).toEqual([]);
 		expect(surface.failure).toBeUndefined();
 	});
@@ -241,7 +244,7 @@ describe("readPackageJsonSurface", () => {
 	it("reports an invalid package.json instead of failing", () => {
 		const root = writeTempFile("package.json", "{ not json");
 		const surface = readPackageJsonSurface(root);
-		expect(surface.dependencies).toEqual([]);
+		expect(surface.dependencies).toEqual({});
 		expect(surface.failure?.check).toBe("package-surface");
 	});
 });

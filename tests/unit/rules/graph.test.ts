@@ -11,6 +11,7 @@ import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapte
 import { runProjectRules } from "../../../src/engine/project-rules.js";
 import type { ProjectRuleDefinition } from "../../../src/engine/registry.js";
 import { circularDependency } from "../../../src/rules/graph/circular-dependency.js";
+import { unusedDependency } from "../../../src/rules/graph/unused-dependency.js";
 import { unusedExport } from "../../../src/rules/graph/unused-export.js";
 import { unusedFile } from "../../../src/rules/graph/unused-file.js";
 
@@ -200,6 +201,48 @@ describe("backend-doctor/unused-export (AC-3, AC-9)", () => {
 		expect(
 			fs.existsSync(path.join(REPO_ROOT, unusedExport.docs)),
 			unusedExport.docs,
+		).toBe(true);
+	});
+});
+
+function unusedDependencyMessage(name: string): string {
+	return `${name} is declared in dependencies but no analyzed file imports it. Remove it from package.json or move it to devDependencies if only tooling uses it.`;
+}
+
+describe("backend-doctor/unused-dependency (AC-4, AC-9)", () => {
+	it("flags declared dependencies no analyzed file imports (AC-4)", () => {
+		expect(
+			summarize(
+				scanGraphFixture(unusedDependency, "unused-dependency/invalid"),
+			),
+		).toEqual([
+			{
+				file: path.join("unused-dependency", "invalid", "package.json"),
+				line: 1,
+				column: 1,
+				message: unusedDependencyMessage("left-pad"),
+				severity: "warn",
+				category: "Maintainability",
+			},
+		]);
+	});
+
+	it("stays silent on used packages, devDependencies, @types and workspace protocols (AC-4)", () => {
+		expect(
+			scanGraphFixture(unusedDependency, "unused-dependency/valid"),
+		).toEqual([]);
+	});
+
+	it("ships valid/invalid fixture trees and a rule doc (AC-9)", () => {
+		for (const dir of ["valid", "invalid"]) {
+			expect(
+				fs.existsSync(path.join(GRAPH_ROOT, "unused-dependency", dir)),
+				dir,
+			).toBe(true);
+		}
+		expect(
+			fs.existsSync(path.join(REPO_ROOT, unusedDependency.docs)),
+			unusedDependency.docs,
 		).toBe(true);
 	});
 });

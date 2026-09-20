@@ -10,6 +10,7 @@ import { noSyncFsInRequestPath } from "./blocking/sync-fs.js";
 import { noEmptyCatch } from "./errors/no-empty-catch.js";
 import { noErrorDetailsLeak } from "./errors/no-error-details-leak.js";
 import { circularDependency } from "./graph/circular-dependency.js";
+import { unusedDependency } from "./graph/unused-dependency.js";
 import { unusedExport } from "./graph/unused-export.js";
 import { unusedFile } from "./graph/unused-file.js";
 import { circularDi } from "./nest/circular-di.js";
@@ -79,7 +80,12 @@ const productRules = [
 	noUnsafeRawQuery,
 ];
 
-const productProjectRules = [circularDependency, unusedExport, unusedFile];
+const productProjectRules = [
+	circularDependency,
+	unusedDependency,
+	unusedExport,
+	unusedFile,
+];
 
 for (const rule of productRules) {
 	registerRule(rule);
