@@ -1,12 +1,22 @@
 # Spec 009 — Nest DI rules (F009)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-20)
 - **Phase:** 2 — Nest specifics & Prisma
 - **Depends on:** F008 (Nest app model) — Done (model, `RuleContext.nest`, pack
   gate, `nest-app-model` skippedCheck); F003 (engine core) — Done; F004
   (framework detection) — Done
 - **Blocks:** F010/F011 (reuse the injection and scope data this feature adds to
   the model), F022 (eval corpus consumes the DI rules)
+
+## Resolution (recorded at approval, 2026-09-20)
+
+The user approved the spec as recommended. All open questions resolved as
+recommended: (1) the extended model fields are exposed in `projects[].nest`
+(additive, no `schemaVersion` bump); (2) **no** rule ships for the
+"blocking constructor work" PLAN bullet — F005/F006 already cover constructor
+bodies, the onModuleInit angle is F011's line; (3) on a forwardRef-less cycle
+both `circular-di` and `missing-forward-ref` fire (distinct positions and
+messages); (4) no new dependencies.
 
 ## Problem
 
