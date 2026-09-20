@@ -1,6 +1,7 @@
 # Spec 015 — Diff scope: `--scope changed|files|lines` (F015)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-20 — all open questions resolved to the
+  recommendations below)
 - **Phase:** 4 — Integrations
 - **Depends on:** F001 CLI skeleton (Done), F002 Config (Done), F003 Engine core (Done), F013 project rules (Done)
 - **Blocks:** F016 GitHub Action (inline review comments consume `--scope lines`), F017 Agent integration (SKILL.md says "run after edits, scope changed")
@@ -198,6 +199,13 @@ backend-doctor scan [path]
   (AC-1 regression net).
 
 ## Open questions for review
+
+All five were resolved on approval (2026-09-20) by adopting the
+recommendations: (1) report contract grows as specified, `schemaVersion` stays
+`1`; (2) project rules are skipped with a visible `skippedChecks` entry in
+partial scopes; (3) `--base` defaults to `HEAD`; (4) `--scope files` takes
+repeatable `--file <path>`; (5) config fields `scope`/`base` are out of F015 —
+CLI-only.
 
 1. **Report contract growth.** Widen `mode` to
    `"full" | "changed" | "files" | "lines"`, flip `complete` to `false` on
