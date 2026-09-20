@@ -213,8 +213,8 @@ describe("backend-doctor/no-cpu-bound-loop (AC-7..8)", () => {
 	});
 });
 
-describe("product registry (AC-9)", () => {
-	it("registers all three blocking rules alongside the async and security packs", () => {
+describe("product registry (AC-13, spec 007)", () => {
+	it("registers all product rules across the async, blocking and security packs", () => {
 		const ids = allRules().map((rule) => rule.id);
 		for (const id of [
 			"backend-doctor/no-sync-fs-in-request-path",
@@ -227,10 +227,16 @@ describe("product registry (AC-9)", () => {
 			"backend-doctor/no-async-foreach-callback",
 			"backend-doctor/unhandled-json-parse",
 			"backend-doctor/no-unhandled-emitter-error",
+			"backend-doctor/no-command-injection",
+			"backend-doctor/no-path-traversal",
+			"backend-doctor/no-hardcoded-secrets",
+			"backend-doctor/no-weak-crypto",
+			"backend-doctor/no-ssrf",
+			"backend-doctor/no-unsafe-merge",
 		]) {
 			expect(ids, id).toContain(id);
 		}
-		expect(ids).toHaveLength(10);
+		expect(ids).toHaveLength(16);
 		expect(new Set(ids).size).toBe(ids.length);
 	});
 });

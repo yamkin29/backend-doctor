@@ -7,8 +7,14 @@ import { unhandledJsonParse } from "./async/unhandled-json-parse.js";
 import { noCpuBoundLoop } from "./blocking/cpu-bound-loop.js";
 import { noSyncCrypto } from "./blocking/sync-crypto.js";
 import { noSyncFsInRequestPath } from "./blocking/sync-fs.js";
+import { noCommandInjection } from "./security/no-command-injection.js";
 import { noEval } from "./security/no-eval.js";
+import { noHardcodedSecrets } from "./security/no-hardcoded-secrets.js";
 import { noNewFunc } from "./security/no-new-func.js";
+import { noPathTraversal } from "./security/no-path-traversal.js";
+import { noSsrf } from "./security/no-ssrf.js";
+import { noUnsafeMerge } from "./security/no-unsafe-merge.js";
+import { noWeakCrypto } from "./security/no-weak-crypto.js";
 
 /**
  * Explicit, greppable product registry (design decision: "boring"). Every
@@ -26,6 +32,12 @@ const productRules = [
 	noSyncFsInRequestPath,
 	noSyncCrypto,
 	noCpuBoundLoop,
+	noCommandInjection,
+	noPathTraversal,
+	noHardcodedSecrets,
+	noWeakCrypto,
+	noSsrf,
+	noUnsafeMerge,
 ];
 
 for (const rule of productRules) {
