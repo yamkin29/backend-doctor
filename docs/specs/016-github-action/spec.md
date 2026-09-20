@@ -1,6 +1,6 @@
 # Spec 016 — GitHub Action: `ci install`, composite action, PR surfaces (F016)
 
-- **Status:** Approved (2026-09-20)
+- **Status:** Implemented (2026-09-20)
 - **Phase:** 4 — Integrations
 - **Depends on:** F001 CLI skeleton (Done), F002 Config (Done), F003 Engine core + reporters (Done), F015 Diff scope (Done — `--scope lines` + merge-base `--base` exist for exactly this consumer)
 - **Blocks:** — (the action's default `npm install` path *activates* at F023 npm publish, but nothing consumes F016)

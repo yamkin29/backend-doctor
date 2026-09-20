@@ -309,3 +309,21 @@ Under interop, a module **without** a default export exposes a *virtual*
   precomputed in `runner.ts`): path-shape rules need the scan-relative
   path and rules have no other way to get it. Project rules already had
   `project.relativePath()`.
+
+### CI integration (spec 016)
+
+- **`spawnSync` in a vitest test deadlocks any in-worker HTTP server the
+  spawned child talks to.** `runCli` blocks the worker's event loop for the
+  whole child lifetime, so a `node:http` server living in that same worker
+  can accept the child's TCP connection (kernel backlog) but its request
+  handler never fires — child waits for a response forever, `spawnSync`
+  waits for the child. The fix is `runCliAsync` in `tests/e2e/helpers.ts`
+  (promisified `execFile`); use it whenever a test serves HTTP to the CLI.
+- **GitHub expressions (`${{ … }}`) inside TS template literals must be
+  written `\${{`** — the same interpolation hazard as `${}` — and Biome's
+  `noTemplateCurlyInString` bans the `${{` sequence inside plain strings,
+  so assertions on rendered expressions belong in template literals with
+  the escape, not in quotes.
+- **`AddressInfo` is exported from `node:net`, not `node:url`** — the
+  natural-looking `import { type AddressInfo } from "node:url"` (next to
+  `fileURLToPath`) fails typecheck.
