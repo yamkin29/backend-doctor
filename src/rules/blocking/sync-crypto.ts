@@ -1,6 +1,6 @@
 import type { CallExpression } from "../../engine/parser/types.js";
 import { defineRule } from "../../engine/registry.js";
-import { findSyncModuleCalls } from "./sync-module-calls.js";
+import { findModuleApiCalls } from "../shared/module-api-calls.js";
 
 /**
  * Crypto functions that are always synchronous — key derivation and
@@ -45,10 +45,11 @@ export const noSyncCrypto = defineRule({
 	severity: "warn",
 	docs: "docs/rules/backend-doctor/no-sync-crypto.md",
 	create(ctx) {
-		for (const { call } of findSyncModuleCalls(ctx.file, {
+		for (const { call } of findModuleApiCalls(ctx.file, {
 			specifiers: CRYPTO_SPECIFIERS,
 			names: [...CRYPTO_ALWAYS, ...CRYPTO_WHEN_NO_CALLBACK],
 			accept: isSyncForm,
+			insideFunctionBodies: true,
 		})) {
 			ctx.report({
 				node: call,

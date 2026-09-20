@@ -1,5 +1,5 @@
 import { defineRule } from "../../engine/registry.js";
-import { findSyncModuleCalls } from "./sync-module-calls.js";
+import { findModuleApiCalls } from "../shared/module-api-calls.js";
 
 /**
  * The sync surface of the node:fs callback API (design §2). Every member
@@ -67,9 +67,10 @@ export const noSyncFsInRequestPath = defineRule({
 	severity: "warn",
 	docs: "docs/rules/backend-doctor/no-sync-fs-in-request-path.md",
 	create(ctx) {
-		for (const { call } of findSyncModuleCalls(ctx.file, {
+		for (const { call } of findModuleApiCalls(ctx.file, {
 			specifiers: FS_SPECIFIERS,
 			names: SYNC_FS_METHODS,
+			insideFunctionBodies: true,
 		})) {
 			ctx.report({
 				node: call,

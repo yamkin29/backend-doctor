@@ -8,44 +8,51 @@ import {
 import { isInsideFunctionLike } from "../async/async-calls.js";
 
 /**
- * Shared collector for the module-API rules of spec 006 (design §1): finds
- * calls inside function bodies whose callee is a property access or bare
- * identifier naming one of the given methods, but only in files that
- * reference one of the given module specifiers (precision gate, spec 006
- * open question 3). Consumed by `no-sync-fs-in-request-path` and
- * `no-sync-crypto`.
+ * Shared collector for module-API rules (spec 006 design §1, generalized for
+ * spec 007): finds calls whose callee is a property access or bare identifier
+ * naming one of the given methods. When `specifiers` is given, the file must
+ * reference one of them (precision gate, spec 006 open question 3); when it
+ * is absent there is no gate — for global APIs (`fetch`, `Object.assign`) and
+ * import-less shapes like hardcoded secrets. `insideFunctionBodies` (default
+ * `true`) keeps the F006 "request path" scope; security rules pass `false`
+ * because an exploit path does not become safe at module top level.
  */
 
-export interface SyncModuleCallOptions {
-	/** Module specifiers (exact match) that activate the scan for a file. */
-	readonly specifiers: readonly string[];
-	/** Callee method names considered blocking. */
+export interface ModuleApiCallOptions {
+	/** Module specifiers (exact match) that activate the scan for a file. Absent = no gate. */
+	readonly specifiers?: readonly string[];
+	/** Callee method names considered. */
 	readonly names: readonly string[];
 	/** Optional extra predicate; a candidate is kept only when it holds. */
 	readonly accept?: (call: CallExpression, name: string) => boolean;
+	/** Restrict matches to call sites inside function bodies. Default `true`. */
+	readonly insideFunctionBodies?: boolean;
 }
 
-export interface SyncModuleCall {
+export interface ModuleApiCall {
 	/** The candidate call; the report position source. */
 	readonly call: CallExpression;
 	/** Matched callee method name. */
 	readonly name: string;
 }
 
-export function findSyncModuleCalls(
+export function findModuleApiCalls(
 	file: SourceFileView,
-	opts: SyncModuleCallOptions,
-): SyncModuleCall[] {
-	const specifiers = file.getModuleSpecifiers();
-	if (!opts.specifiers.some((candidate) => specifiers.includes(candidate))) {
-		return [];
+	opts: ModuleApiCallOptions,
+): ModuleApiCall[] {
+	if (opts.specifiers && opts.specifiers.length > 0) {
+		const specifiers = file.getModuleSpecifiers();
+		if (!opts.specifiers.some((candidate) => specifiers.includes(candidate))) {
+			return [];
+		}
 	}
+	const insideFunctionBodies = opts.insideFunctionBodies ?? true;
 	const shadowed = collectSameFileBindings(file);
-	const calls: SyncModuleCall[] = [];
+	const calls: ModuleApiCall[] = [];
 	file.forEachDescendant((node) => {
 		const call = node.asKind(SyntaxKind.CallExpression);
 		if (!call) return undefined;
-		if (!isInsideFunctionLike(call)) return undefined;
+		if (insideFunctionBodies && !isInsideFunctionLike(call)) return undefined;
 		const callee = unwrapParens(call.getExpression());
 		if (Node.isPropertyAccessExpression(callee)) {
 			const name = callee.getName();
@@ -67,10 +74,10 @@ export function findSyncModuleCalls(
 }
 
 function keep(
-	calls: SyncModuleCall[],
+	calls: ModuleApiCall[],
 	call: CallExpression,
 	name: string,
-	opts: SyncModuleCallOptions,
+	opts: ModuleApiCallOptions,
 ): void {
 	if (!opts.accept || opts.accept(call, name)) {
 		calls.push({ call, name });
@@ -78,9 +85,9 @@ function keep(
 }
 
 /**
- * Names bound by any same-file function declaration or variable statement
- * (design decision 2): a bare-identifier callee with one of these names is
- * the user's own function, not the module API.
+ * Names bound by any same-file function declaration or variable statement:
+ * a bare-identifier callee with one of these names is the user's own
+ * function, not the module API.
  */
 function collectSameFileBindings(file: SourceFileView): Set<string> {
 	const names = new Set<string>();
@@ -104,8 +111,8 @@ function collectSameFileBindings(file: SourceFileView): Set<string> {
 
 /**
  * True for `this.<member>` where the nearest enclosing class declares
- * `<member>` — a class method named like an fs/crypto API is user code, not
- * the module (design decision 3).
+ * `<member>` — a class method named like a module API is user code, not the
+ * module.
  */
 function isOwnClassMember(call: CallExpression, callee: Expression): boolean {
 	if (!Node.isPropertyAccessExpression(callee)) return false;
