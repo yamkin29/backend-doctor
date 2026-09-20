@@ -11,6 +11,7 @@ import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapte
 import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { extractNestAppModel } from "../../../src/framework/nest/extract.js";
+import { circularDi } from "../../../src/rules/nest/circular-di.js";
 import { providerNotRegistered } from "../../../src/rules/nest/provider-not-registered.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
@@ -110,6 +111,59 @@ describe("backend-doctor/provider-not-registered (AC-6, AC-7, AC-14)", () => {
 					REPO_ROOT,
 					"docs/rules/backend-doctor/provider-not-registered.md",
 				),
+			),
+		).toBe(true);
+	});
+});
+
+describe("backend-doctor/circular-di (AC-8, AC-14)", () => {
+	const rule = circularDi;
+	const message = (pathText: string) =>
+		`Providers form a circular dependency: ${pathText}. Restructure so dependencies flow one way (extract a shared third provider); a truly mutual pair needs forwardRef() on both sides.`;
+
+	it("reports one diagnostic per cycle at the canonical member (AC-8)", () => {
+		expect(summarize(scanNestFixture(rule, "circular-di/invalid"))).toEqual([
+			{
+				file: path.join("circular-di", "invalid", "a.service.ts"),
+				line: 3,
+				column: 1,
+				message: message("AService → BService → AService"),
+				severity: "warn",
+				category: "Architecture",
+			},
+			{
+				file: path.join("circular-di", "invalid", "c.service.ts"),
+				line: 3,
+				column: 1,
+				message: message("CService → DService → EService → CService"),
+				severity: "warn",
+				category: "Architecture",
+			},
+			{
+				file: path.join("circular-di", "invalid", "loop.service.ts"),
+				line: 3,
+				column: 1,
+				message: message("LoopService → LoopService"),
+				severity: "warn",
+				category: "Architecture",
+			},
+		]);
+	});
+
+	it("stays silent on an acyclic provider graph (AC-8)", () => {
+		expect(scanNestFixture(rule, "circular-di/valid")).toEqual([]);
+	});
+
+	it("ships valid/invalid fixtures and a rule doc (AC-14)", () => {
+		for (const dir of ["valid", "invalid"]) {
+			expect(
+				fs.existsSync(path.join(FIXTURE_ROOT, "circular-di", dir)),
+				dir,
+			).toBe(true);
+		}
+		expect(
+			fs.existsSync(
+				path.join(REPO_ROOT, "docs/rules/backend-doctor/circular-di.md"),
 			),
 		).toBe(true);
 	});
