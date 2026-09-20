@@ -14,6 +14,7 @@ import { noEval } from "../../../src/rules/security/no-eval.js";
 import { noHardcodedSecrets } from "../../../src/rules/security/no-hardcoded-secrets.js";
 import { noNewFunc } from "../../../src/rules/security/no-new-func.js";
 import { noPathTraversal } from "../../../src/rules/security/no-path-traversal.js";
+import { noSsrf } from "../../../src/rules/security/no-ssrf.js";
 import { noWeakCrypto } from "../../../src/rules/security/no-weak-crypto.js";
 
 const FIXTURE_ROOT = path.resolve(
@@ -29,6 +30,7 @@ const rules: Record<string, RuleDefinition> = {
 	"no-path-traversal": noPathTraversal,
 	"no-hardcoded-secrets": noHardcodedSecrets,
 	"no-weak-crypto": noWeakCrypto,
+	"no-ssrf": noSsrf,
 };
 
 /** Runs one rule over a fixture directory using the real parser adapter. */
@@ -311,5 +313,43 @@ describe("backend-doctor/no-weak-crypto (AC-7..8)", () => {
 
 	it("stays silent on strong and non-literal algorithms and non-crypto files (AC-8)", () => {
 		expect(scanFixture("no-weak-crypto", "no-weak-crypto/valid")).toEqual([]);
+	});
+});
+
+describe("backend-doctor/no-ssrf (AC-9..10)", () => {
+	const message =
+		"Fetching a URL taken from request input lets attackers reach internal services (SSRF). Validate the host against an allowlist before requesting it.";
+
+	it("flags fetch/axios calls with request-derived URLs (AC-9)", () => {
+		expect(summarize(scanFixture("no-ssrf", "no-ssrf/invalid"))).toEqual([
+			{
+				file: path.join("no-ssrf", "invalid", "axios-get.ts"),
+				line: 4,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-ssrf", "invalid", "fetch-req-url.ts"),
+				line: 2,
+				column: 25,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-ssrf", "invalid", "template-fetch.ts"),
+				line: 2,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+		]);
+	});
+
+	it("stays silent on literal URLs, shadowed fetch and non-axios files (AC-10)", () => {
+		expect(scanFixture("no-ssrf", "no-ssrf/valid")).toEqual([]);
 	});
 });
