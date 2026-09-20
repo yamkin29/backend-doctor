@@ -424,3 +424,91 @@ describe("runScan blocking rules (AC-10, spec 006)", () => {
 		}
 	});
 });
+
+describe("runScan security rules (AC-14, spec 007)", () => {
+	function writeSecurityProject(): string {
+		const tmp = fs.mkdtempSync(
+			path.join(os.tmpdir(), "backend-doctor-security-"),
+		);
+		const src = path.join(tmp, "src");
+		fs.mkdirSync(src, { recursive: true });
+		fs.writeFileSync(
+			path.join(src, "api.ts"),
+			[
+				'import { exec } from "node:child_process";',
+				'import path from "node:path";',
+				'import { createHash } from "node:crypto";',
+				'import axios from "axios";',
+				'import _ from "lodash";',
+				"",
+				'const apiKey = "sk_live_9fK3pXwR7vTqzLm5Yh8Cd1BnJ2";',
+				"",
+				"export async function handle(req: {",
+				"\tbody: Record<string, string>;",
+				"\tparams: { file: string };",
+				"\tquery: { url: string };",
+				"}): Promise<unknown> {",
+				'\tconst file = path.join("/uploads", req.params.file);',
+				"\tconst listing = exec(`ls ${file}`);",
+				'\tconst digest = createHash("md5").update(listing).digest("hex");',
+				"\tconst body = Object.assign({}, req.body);",
+				"\tconst response = await axios.get(req.query.url);",
+				"\treturn { file, listing, digest, body, response };",
+				"}",
+			].join("\n"),
+		);
+		return tmp;
+	}
+
+	it("reports the six security violations in report order at warn severity", async () => {
+		const tmp = writeSecurityProject();
+		try {
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(
+				result.diagnostics.map((d) => [d.line, d.column, d.rule, d.severity]),
+			).toEqual([
+				[7, 7, "backend-doctor/no-hardcoded-secrets", "warn"],
+				[14, 15, "backend-doctor/no-path-traversal", "warn"],
+				[15, 18, "backend-doctor/no-command-injection", "warn"],
+				[16, 17, "backend-doctor/no-weak-crypto", "warn"],
+				[17, 15, "backend-doctor/no-unsafe-merge", "warn"],
+				[18, 25, "backend-doctor/no-ssrf", "warn"],
+			]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("escalates one security rule to error without touching the others", async () => {
+		const tmp = writeSecurityProject();
+		try {
+			const config = defaultConfig();
+			config.rules["backend-doctor/no-path-traversal"] = "error";
+
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config,
+			});
+
+			const byRule = Object.fromEntries(
+				result.diagnostics.map((d) => [d.rule, d.severity]),
+			);
+			expect(byRule).toEqual({
+				"backend-doctor/no-hardcoded-secrets": "warn",
+				"backend-doctor/no-path-traversal": "error",
+				"backend-doctor/no-command-injection": "warn",
+				"backend-doctor/no-weak-crypto": "warn",
+				"backend-doctor/no-unsafe-merge": "warn",
+				"backend-doctor/no-ssrf": "warn",
+			});
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+});
