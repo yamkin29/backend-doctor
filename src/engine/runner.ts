@@ -68,6 +68,7 @@ export function runRules(opts: RunRulesOptions): RuleRunOutcome {
 		const findings: ReportInput[] = [];
 		const ctx: RuleContext = {
 			file,
+			relativePath: relativeFile,
 			nest: opts.nestModel,
 			report: (input) => {
 				findings.push(input);

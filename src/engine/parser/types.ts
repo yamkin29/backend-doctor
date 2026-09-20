@@ -81,6 +81,11 @@ export interface ReportInput {
 export interface RuleContext {
 	file: SourceFileView;
 	/**
+	 * Target-relative posix path of the file (spec 014): precomputed by the
+	 * runner so path-shape rules do not need the scan root.
+	 */
+	relativePath: string;
+	/**
 	 * Nest application model (spec 008), present when the scan target is a
 	 * Nest project. Rules query it for cross-file structure; findings are
 	 * still reported against `file` only.

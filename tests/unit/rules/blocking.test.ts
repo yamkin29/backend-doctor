@@ -218,7 +218,7 @@ describe("backend-doctor/no-cpu-bound-loop (AC-7..8)", () => {
 });
 
 describe("product registry (AC-13, spec 007)", () => {
-	it("registers all product rules across the async, blocking and security packs", () => {
+	it("registers all product rules across the shipped packs", () => {
 		const ids = [...allRules(), ...allProjectRules()].map((rule) => rule.id);
 		for (const id of [
 			"backend-doctor/no-sync-fs-in-request-path",
@@ -244,7 +244,7 @@ describe("product registry (AC-13, spec 007)", () => {
 		]) {
 			expect(ids, id).toContain(id);
 		}
-		expect(ids).toHaveLength(38);
+		expect(ids).toHaveLength(39);
 		expect(new Set(ids).size).toBe(ids.length);
 	});
 });
