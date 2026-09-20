@@ -12,6 +12,7 @@ import { runRules } from "../../../src/engine/runner.js";
 import { noCommandInjection } from "../../../src/rules/security/no-command-injection.js";
 import { noEval } from "../../../src/rules/security/no-eval.js";
 import { noNewFunc } from "../../../src/rules/security/no-new-func.js";
+import { noPathTraversal } from "../../../src/rules/security/no-path-traversal.js";
 
 const FIXTURE_ROOT = path.resolve(
 	import.meta.dirname,
@@ -23,6 +24,7 @@ const rules: Record<string, RuleDefinition> = {
 	"no-eval": noEval,
 	"no-new-func": noNewFunc,
 	"no-command-injection": noCommandInjection,
+	"no-path-traversal": noPathTraversal,
 };
 
 /** Runs one rule over a fixture directory using the real parser adapter. */
@@ -171,5 +173,47 @@ describe("backend-doctor/no-command-injection (AC-1..2)", () => {
 		expect(
 			scanFixture("no-command-injection", "no-command-injection/valid"),
 		).toEqual([]);
+	});
+});
+
+describe("backend-doctor/no-path-traversal (AC-3..4)", () => {
+	const message =
+		'Path segments taken from request data allow ".." traversal out of the intended directory. Normalize with path.basename or validate the value against an allowlist before joining.';
+
+	it("flags request-derived path.join/resolve arguments (AC-3)", () => {
+		expect(
+			summarize(scanFixture("no-path-traversal", "no-path-traversal/invalid")),
+		).toEqual([
+			{
+				file: path.join("no-path-traversal", "invalid", "join-req-params.ts"),
+				line: 4,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-path-traversal", "invalid", "resolve-req-body.ts"),
+				line: 4,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-path-traversal", "invalid", "template-join.ts"),
+				line: 4,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+		]);
+	});
+
+	it("stays silent on trusted arguments, array joins and non-path files (AC-4)", () => {
+		expect(scanFixture("no-path-traversal", "no-path-traversal/valid")).toEqual(
+			[],
+		);
 	});
 });
