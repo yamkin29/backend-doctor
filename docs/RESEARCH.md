@@ -310,6 +310,24 @@ Under interop, a module **without** a default export exposes a *virtual*
   path and rules have no other way to get it. Project rules already had
   `project.relativePath()`.
 
+### Agent integration (spec 017)
+
+- **JSON key order in jsonl is construction order:** `JSON.stringify` emits
+  object keys in insertion order, and the runner builds every `Diagnostic`
+  literal in the interface's declaration order (`id, filePath, line, column,
+  rule, category, severity, message, tags`) — `tests/unit/jsonl-contract.test.ts`
+  pins this, so reordering the literal breaks the pinned jsonl contract loudly
+  instead of silently changing agent-facing bytes.
+- **Rule docs are registry-checked:** `checkRuleDocs()`
+  (`src/rule-docs/index.ts`, run by `tests/unit/rule-docs.test.ts` in CI)
+  fails on a missing doc, a heading/Category/Default-severity mismatch, a
+  `docs` path outside `docs/rules/`, or an orphan doc. A new rule is not done
+  until its doc passes this gate; scaffold with
+  `pnpm build && node dist/scripts/rule-docs.js --scaffold <rule-id>`.
+- **Second tsup entries need no wiring:** vitest `globalSetup` calls tsup
+  `build` with the same `buildOptions`, so a new entry (e.g.
+  `dist/scripts/rule-docs.js`) is built by every test run automatically.
+
 ### CI integration (spec 016)
 
 - **`spawnSync` in a vitest test deadlocks any in-worker HTTP server the

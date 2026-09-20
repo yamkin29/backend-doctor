@@ -1,6 +1,6 @@
 # Spec 017 — Agent integration: SKILL.md, rule-docs tooling, `rules` command, stable jsonl (F017)
 
-- **Status:** Approved (2026-09-20)
+- **Status:** Implemented (2026-09-20)
 - **Phase:** 4 — Integrations
 - **Depends on:** F001 CLI skeleton (Done — `run.ts` command wiring, exit codes), F002
   Config (Done — rule ids validated against the registry), F003 Engine core +
