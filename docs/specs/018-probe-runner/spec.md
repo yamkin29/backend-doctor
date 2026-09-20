@@ -1,6 +1,6 @@
 # Spec 018 — Runtime probe runner (F018)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-21)
 - **Phase:** 5 — Runtime engine
 - **Depends on:** F001 CLI skeleton (Done — `run.ts` command wiring, exit-code
   discipline, stdout/stderr purity), F017 Agent integration (Done — the
@@ -315,6 +315,16 @@ no session directory created, child not spawned)**
   probe tests run against the real built artifact.
 
 ## Open questions for review
+
+All four were resolved on approval (2026-09-21) by adopting the recommendations:
+(1) child exit code pass-through (0–255), `2` for probe usage/environment errors,
+`128 + signum` when the probe itself is signaled, `--duration` expiry requests
+graceful shutdown (SIGINT → SIGTERM → SIGKILL at fixed 5s steps) with the child end
+recorded and passed through; (2) the session-directory trace contract exactly as in
+Contract, versioned by `traceSchemaVersion` (starts at 1, separate from the report's
+`schemaVersion`), default storage `./.backend-doctor/probe/` plus a `.gitignore`
+line in this repository; (3) `--filter` ships now as session metadata with
+collector-restriction semantics; (4) no new dependencies.
 
 - **OQ-1 — probe exit-code and termination semantics (contract; user-owned).**
   Recommendation: pass the child's exit code through (0–255, so 1 means "the child
