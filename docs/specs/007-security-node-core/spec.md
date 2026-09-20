@@ -1,6 +1,6 @@
 # Spec 007 — Security rules, Node core (F007)
 
-- **Status:** Approved (2026-09-20)
+- **Status:** Implemented (2026-09-20)
 - **Phase:** 1 — Node core rules
 - **Depends on:** F003 (Engine core) — Done (`defineRule`, runner, registry);
   F004 (Framework detection) — Done (pack gate exists; unused by these rules);

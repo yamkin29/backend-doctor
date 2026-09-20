@@ -58,6 +58,16 @@ Under interop, a module **without** a default export exposes a *virtual*
   `internal` diagnostic + `skippedChecks` entry (constitution §8, verified
   live in spec 005 T6). Use `node.asKind(SyntaxKind.Parameter)` instead: it
   both guards and narrows.
+- **`TemplateExpression.getSpans()` does not exist** (v28) — the method is
+  `getTemplateSpans()` (plus `getHead()`); the phantom method surfaces as a
+  runtime TypeError caught by the helper unit test (bit spec 007 T2). Same
+  family as the `while.getCondition()` trap below: probe the prototype
+  chain before trusting a ts-morph method name.
+- **`VariableDeclaration` position is the declarator name, not the
+  statement.** `const apiKey = …` starts at the column of `apiKey`, one
+  tab past the line start; `Node.getStart()` of a statement-level call is
+  its callee's start. Fixture positions are easiest pinned by letting the
+  first failing test print the real coordinates (spec 007 T3–T8).
 - **`TryStatement.getCatchClause()`** exists and returns `undefined` for a
   finally-only try — the right predicate for "guarded by try/catch"
   (`unhandled-json-parse`, spec 005).
