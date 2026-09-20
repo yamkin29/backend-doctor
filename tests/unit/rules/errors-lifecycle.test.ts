@@ -11,20 +11,18 @@ import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapte
 import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { noEmptyCatch } from "../../../src/rules/errors/no-empty-catch.js";
+import { noErrorDetailsLeak } from "../../../src/rules/errors/no-error-details-leak.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const FLAT_ROOT = path.resolve(
 	import.meta.dirname,
 	"../../fixtures/backend-doctor",
 );
-const NEST_ROOT = path.resolve(
-	import.meta.dirname,
-	"../../fixtures/nest/errors-lifecycle",
-);
 
 /** Short fixture id → rule under test (grows with each rule task). */
 const rulesById: Record<string, RuleDefinition> = {
 	"no-empty-catch": noEmptyCatch,
+	"no-error-details-leak": noErrorDetailsLeak,
 };
 
 /** Runs one framework-free rule over a flat fixture directory. */
@@ -109,6 +107,63 @@ describe("backend-doctor/no-empty-catch (AC-1, AC-5, AC-9)", () => {
 		expect(
 			fs.existsSync(path.join(REPO_ROOT, noEmptyCatch.docs)),
 			noEmptyCatch.docs,
+		).toBe(true);
+	});
+});
+
+const LEAK_MESSAGE =
+	"A stack trace reaches the client through this response; stacks expose file paths and internal structure. Log the error server-side and return a generic message or a safe error payload instead.";
+
+describe("backend-doctor/no-error-details-leak (AC-2, AC-5, AC-9)", () => {
+	it("flags stack traces in response calls with exact diagnostics (AC-2)", () => {
+		expect(
+			summarize(
+				scanFixture("no-error-details-leak", "no-error-details-leak/invalid"),
+			),
+		).toEqual([
+			{
+				file: path.join("no-error-details-leak", "invalid", "express-style.ts"),
+				line: 8,
+				column: 2,
+				message: LEAK_MESSAGE,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-error-details-leak", "invalid", "nest-filter.ts"),
+				line: 12,
+				column: 3,
+				message: LEAK_MESSAGE,
+				severity: "warn",
+				category: "Security",
+			},
+		]);
+	});
+
+	it("flags one diagnostic per response call however many stack references it carries (AC-2)", () => {
+		const diagnostics = scanFixture(
+			"no-error-details-leak",
+			"no-error-details-leak/invalid",
+		).filter((d) => d.filePath.endsWith("nest-filter.ts"));
+		expect(diagnostics).toHaveLength(1);
+	});
+
+	it("stays silent on message-only responses, non-response receivers and stack-free responses (AC-2, AC-5)", () => {
+		expect(
+			scanFixture("no-error-details-leak", "no-error-details-leak/valid"),
+		).toEqual([]);
+	});
+
+	it("ships valid/invalid fixtures and a rule doc (AC-9)", () => {
+		for (const dir of ["valid", "invalid"]) {
+			expect(
+				fs.existsSync(path.join(FLAT_ROOT, "no-error-details-leak", dir)),
+				dir,
+			).toBe(true);
+		}
+		expect(
+			fs.existsSync(path.join(REPO_ROOT, noErrorDetailsLeak.docs)),
+			noErrorDetailsLeak.docs,
 		).toBe(true);
 	});
 });
