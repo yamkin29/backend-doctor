@@ -1,0 +1,78 @@
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import {
+	collectFiles,
+	SUPPORTED_EXTENSIONS,
+} from "../../../src/engine/collect.js";
+import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapter.js";
+import { extractNestAppModel } from "../../../src/framework/nest/extract.js";
+
+const FIXTURE_ROOT = path.resolve(import.meta.dirname, "../../fixtures/nest");
+const APP_ROOT = path.join(FIXTURE_ROOT, "model-app");
+
+/** Runs the real extractor over the committed fixture app. */
+function extractModel(): ReturnType<typeof extractNestAppModel> {
+	const paths = collectFiles({
+		target: APP_ROOT,
+		extensions: SUPPORTED_EXTENSIONS,
+		excludes: [],
+		ignoreGlobs: [],
+	});
+	const adapter = new TsMorphParserAdapter();
+	const { files } = adapter.createProject(paths);
+	return extractNestAppModel(files, adapter);
+}
+
+describe("nest model: modules (AC-1, AC-6)", () => {
+	it("extracts module entries with references as written (AC-1)", () => {
+		const { modules } = extractModel();
+		expect(modules).toEqual([
+			{
+				filePath: path.join(APP_ROOT, "app.module.ts"),
+				className: "AppModule",
+				line: 6,
+				column: 1,
+				imports: ["UsersModule"],
+				providers: ["UsersService"],
+				controllers: ["UsersController"],
+				exports: [],
+			},
+			{
+				filePath: path.join(APP_ROOT, "dynamic", "dynamic.module.ts"),
+				className: "DynamicModule",
+				line: 11,
+				column: 1,
+				imports: ["UsersService"],
+				providers: [],
+				controllers: [],
+				exports: [],
+			},
+			{
+				filePath: path.join(APP_ROOT, "dynamic", "dynamic.module.ts"),
+				className: "LooseModule",
+				line: 18,
+				column: 1,
+				imports: [],
+				providers: [],
+				controllers: [],
+				exports: [],
+			},
+			{
+				filePath: path.join(APP_ROOT, "users", "users.module.ts"),
+				className: "UsersModule",
+				line: 11,
+				column: 1,
+				imports: [],
+				providers: ["UsersService", "UsersService"],
+				controllers: [],
+				exports: ["UsersService"],
+			},
+		]);
+	});
+
+	it("collects nothing from files without a @nestjs import (AC-6)", () => {
+		const model = extractModel();
+		const classNames = model.modules.map((m) => m.className);
+		expect(classNames).not.toContain("PlainModule");
+	});
+});
