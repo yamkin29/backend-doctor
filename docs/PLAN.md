@@ -72,7 +72,7 @@ projects[] }`.
 | F008 | Nest app model (decorators → app model) | 2 | Done |
 | F009 | Rules: Nest DI | 2 | Done |
 | F010 | Rules: layers & DTO | 2 | Done |
-| F011 | Rules: errors & lifecycle | 2 | Planned |
+| F011 | Rules: errors & lifecycle | 2 | Done |
 | F012 | Rules: Prisma | 2 | Planned |
 | F013 | Graph rules (cycles, unused) | 3 | Planned |
 | F014 | Rules: config/env | 3 | Planned |

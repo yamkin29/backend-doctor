@@ -1,6 +1,6 @@
 # Spec 011 — Rules: errors & lifecycle (F011)
 
-- **Status:** Approved (2026-09-20)
+- **Status:** Implemented (2026-09-20)
 - **Phase:** 2 — Nest specifics & Prisma
 - **Depends on:** F008 (Nest app model: providers with className/position) —
   Done; F009/F010 (pack gate, per-file model-query and in-rule AST precedent)

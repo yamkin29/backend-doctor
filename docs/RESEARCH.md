@@ -71,6 +71,21 @@ Under interop, a module **without** a default export exposes a *virtual*
 - **`TryStatement.getCatchClause()`** exists and returns `undefined` for a
   finally-only try — the right predicate for "guarded by try/catch"
   (`unhandled-json-parse`, spec 005).
+- **`CatchClause.getBlock()`, not `getBody()`** (v28): a catch clause's block
+  is `block` in the compiler AST, so the wrapper follows the compiler name;
+  `getBody` surfaces as a runtime "not a function" crash inside the rule,
+  caught by the exact-diagnostic test (bit spec 011 T1). The body block's
+  `getFullText()` spans the comments *inside* the braces — the deterministic
+  way to tell `catch {}` from `catch { /* deliberate */ }` (strip
+  braces/whitespace); a comment after the closing brace is outside
+  `getFullText()`.
+- **Chained-call receivers unwrap through member accesses, not straight to
+  the root** (spec 011 T2): `res.status(500).json(…)` — the json call's
+  receiver is the CallExpression `res.status(500)`, whose expression is the
+  PropertyAccessExpression `res.status`, and only then the `res` identifier.
+  A chain walker that handles calls/parens but not member accesses silently
+  matches nothing. Same family as the naming traps above: probe with a real
+  chain before trusting the walk.
 - **`void f()` / `await f()` are structurally not statement-level
   CallExpressions** (ExpressionStatement wraps VoidExpression /
   AwaitExpression), so a "statement-level call" check suppresses them for
