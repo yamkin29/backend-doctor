@@ -1,6 +1,6 @@
 # Spec 010 — Rules: layers & DTO (F010)
 
-- **Status:** Approved (2026-09-20)
+- **Status:** Implemented (2026-09-20)
 - **Phase:** 2 — Nest specifics & Prisma
 - **Depends on:** F008 (Nest app model) — Done; F009 (DI rules: injections on
   model entries, `frameworks` pack gate, per-file model-query precedent) —

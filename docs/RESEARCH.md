@@ -97,6 +97,29 @@ Under interop, a module **without** a default export exposes a *virtual*
   `@Inject(…)`-decorated constructor parameter starts at the `@`, an
   undecorated one at its first modifier (`private`). Pin DI-edge coordinates
   from real runs, not by counting characters.
+- **Decorated *properties* complete the pattern** (spec 010): a
+  `@ApiProperty()`-decorated class property also starts at the leading `@`.
+  Anything decorated positions at its first decorator; only plain
+  declarations position at the declaration keyword.
+
+### Property and method readers (spec 010)
+
+- **`MethodDeclaration.getScope()` exists on v28** and returns
+  `"public" | "protected" | "private"` from the modifier list — the clean way
+  to count public API (properties expose it too). `isStatic()` pairs with it.
+- **`PropertyDeclaration.getInitializer() !== undefined`** is the reliable
+  "has initializer" test; `getTypeNode()?.getText()` returns `undefined` for
+  untyped properties and keeps source whitespace otherwise (`"Array < any >"`)
+  — collapse with `replace(/\s+/g, "")` before comparing type text.
+- **`DefaultClause` is a separate `SyntaxKind` from `CaseClause`** — a branch
+  census that counts `CaseClause` only is cyclomatic-aligned (the default arm
+  is the fall-through path, not a new branch). All of `IfStatement`,
+  `ForStatement`, `ForOfStatement`, `ForInStatement`, `WhileStatement`,
+  `DoStatement`, `ConditionalExpression`, `CaseClause` appear as distinct
+  descendant kinds under the enclosing node.
+- **No `getDescendantsAtKind` on function/method nodes** (v28) — use
+  `forEachDescendant` with a `getKind()` census (same family as the missing
+  `Node.isParameter` guard).
 - **Read decorator arguments through `Decorator.getCallExpression()`**, then
   `getArguments()[0]`; a bare `@Decorator` (no call) has no arguments.
   `StringLiteral.getLiteralText()` returns the unquoted value (`getText()`
