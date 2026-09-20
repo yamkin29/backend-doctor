@@ -449,6 +449,7 @@ describe("runScan security rules (AC-14, spec 007)", () => {
 				"\tquery: { url: string };",
 				"}): Promise<unknown> {",
 				'\tconst file = path.join("/uploads", req.params.file);',
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: the placeholder is the staged input
 				"\tconst listing = exec(`ls ${file}`);",
 				'\tconst digest = createHash("md5").update(listing).digest("hex");',
 				"\tconst body = Object.assign({}, req.body);",
