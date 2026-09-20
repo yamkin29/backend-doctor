@@ -7,6 +7,7 @@ import {
 	ciReportCommand,
 } from "./commands/ci.js";
 import { initCommand } from "./commands/init.js";
+import { type ProbeCommandOptions, probeCommand } from "./commands/probe.js";
 import { rulesExplainCommand, rulesListCommand } from "./commands/rules.js";
 import { type ScanCommandOptions, scanCommand } from "./commands/scan.js";
 import { resolveVersion } from "./version.js";
@@ -77,6 +78,31 @@ export async function run(argv: string[]): Promise<number> {
 				...opts,
 				format: opts.format as ReportFormat,
 			});
+		});
+
+	program
+		.command("probe")
+		.description(
+			"Run an app instrumented and record a local profiling session (spec 018).",
+		)
+		.option(
+			"--duration <seconds>",
+			"cap the session; graceful shutdown escalation at expiry",
+		)
+		.option(
+			"--out <dir>",
+			"storage root for the session directory (default: ./.backend-doctor/probe)",
+		)
+		.option(
+			"--filter <glob>",
+			"collector restriction recorded in session metadata; repeatable",
+			collectRepeatable,
+			[],
+		)
+		.argument("[command...]", "start command, after --")
+		.exitOverride()
+		.action(async (command: string[], opts: ProbeCommandOptions) => {
+			exit = await probeCommand(command, opts);
 		});
 
 	program
