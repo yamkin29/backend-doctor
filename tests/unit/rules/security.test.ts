@@ -11,6 +11,7 @@ import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { noCommandInjection } from "../../../src/rules/security/no-command-injection.js";
 import { noEval } from "../../../src/rules/security/no-eval.js";
+import { noHardcodedSecrets } from "../../../src/rules/security/no-hardcoded-secrets.js";
 import { noNewFunc } from "../../../src/rules/security/no-new-func.js";
 import { noPathTraversal } from "../../../src/rules/security/no-path-traversal.js";
 
@@ -25,6 +26,7 @@ const rules: Record<string, RuleDefinition> = {
 	"no-new-func": noNewFunc,
 	"no-command-injection": noCommandInjection,
 	"no-path-traversal": noPathTraversal,
+	"no-hardcoded-secrets": noHardcodedSecrets,
 };
 
 /** Runs one rule over a fixture directory using the real parser adapter. */
@@ -215,5 +217,49 @@ describe("backend-doctor/no-path-traversal (AC-3..4)", () => {
 		expect(scanFixture("no-path-traversal", "no-path-traversal/valid")).toEqual(
 			[],
 		);
+	});
+});
+
+describe("backend-doctor/no-hardcoded-secrets (AC-5..6)", () => {
+	const message =
+		"This looks like a hardcoded secret; anyone with the source has the credential. Load it from the environment or a secret manager instead.";
+
+	it("flags long high-entropy literals under secret-shaped names (AC-5)", () => {
+		expect(
+			summarize(
+				scanFixture("no-hardcoded-secrets", "no-hardcoded-secrets/invalid"),
+			),
+		).toEqual([
+			{
+				file: path.join("no-hardcoded-secrets", "invalid", "class-property.ts"),
+				line: 2,
+				column: 2,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-hardcoded-secrets", "invalid", "const-api-key.ts"),
+				line: 1,
+				column: 7,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-hardcoded-secrets", "invalid", "object-literal.ts"),
+				line: 2,
+				column: 2,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+		]);
+	});
+
+	it("stays silent on env access, short and low-entropy literals, ambiguous names (AC-6)", () => {
+		expect(
+			scanFixture("no-hardcoded-secrets", "no-hardcoded-secrets/valid"),
+		).toEqual([]);
 	});
 });
