@@ -1,6 +1,6 @@
 # Spec 008 — Nest app model (F008)
 
-- **Status:** Approved (2026-09-20)
+- **Status:** Implemented (2026-09-20)
 - **Phase:** 2 — Nest specifics & Prisma
 - **Depends on:** F003 (Engine core) — Done (`SourceFileView` traversal, adapter,
   runner); F004 (Framework detection) — Done (`nest` id, pack gate, `getModuleSpecifiers`)

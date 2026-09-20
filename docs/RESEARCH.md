@@ -87,6 +87,29 @@ Under interop, a module **without** a default export exposes a *virtual*
   `asKind(SyntaxKind.WhileStatement / SyntaxKind.DoStatement)` →
   `getExpression()`.
 
+### Decorator extraction (spec 008)
+
+- **Class and method `getStart()` spans include decorators.** A decorated
+  class positions at the leading `@` of its first decorator; an undecorated
+  `export class` positions at the `export` keyword. Model entries in
+  `src/framework/nest/` pin fixture coordinates on this basis.
+- **Read decorator arguments through `Decorator.getCallExpression()`**, then
+  `getArguments()[0]`; a bare `@Decorator` (no call) has no arguments.
+  `StringLiteral.getLiteralText()` returns the unquoted value (`getText()`
+  keeps the quotes — wrong for route strings).
+- **Decorator name: unwrap `getExpression()` yourself** (CallExpression →
+  its callee; Identifier → text; PropertyAccessExpression → `getName()`).
+  `Decorator.getName()` exists but the unwrap is what survives namespace
+  decorators (`@Ns.Mod`) predictably.
+- **Array spreads have no `Node.isSpreadElement`-style trust** — distinguish
+  by `element.getKind() === SyntaxKind.SpreadElement` (same family as the
+  missing `Node.isParameter`). Object-literal spreads DO have
+  `Node.isSpreadAssignment`.
+- **`PropertyAssignment.getName()`/`getInitializer()` and
+  `ObjectLiteralExpression.getProperties()`** are the safe way to read
+  decorator metadata; `getProperty(name)` is fine too but iteration lets you
+  report spreads/computed keys instead of silently skipping them.
+
 ### pnpm 12
 
 - Build-script approvals live in `pnpm-workspace.yaml` → `allowBuilds: esbuild: true`

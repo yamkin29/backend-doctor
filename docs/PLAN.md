@@ -69,7 +69,7 @@ projects[] }`.
 | F005 | Rules: async correctness | 1 | Done |
 | F006 | Rules: event-loop blocking | 1 | Done |
 | F007 | Rules: security (Node core) | 1 | Done |
-| F008 | Nest app model (decorators → app model) | 2 | Planned |
+| F008 | Nest app model (decorators → app model) | 2 | Done |
 | F009 | Rules: Nest DI | 2 | Planned |
 | F010 | Rules: layers & DTO | 2 | Planned |
 | F011 | Rules: errors & lifecycle | 2 | Planned |
