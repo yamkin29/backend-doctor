@@ -36,7 +36,9 @@ describe("e2e: framework contract through the bin (spec 004)", () => {
 			projects: Array<Record<string, unknown>>;
 		};
 		expect(doc.schemaVersion).toBe(1);
-		expect(doc.diagnostics).toHaveLength(1);
+		// no-eval + unused-dependency: lodash is declared, never imported
+		// (spec 013 graph finding on the staged tree).
+		expect(doc.diagnostics).toHaveLength(2);
 		expect(doc.projects[0]?.frameworks).toEqual(["express"]);
 	});
 
@@ -51,10 +53,17 @@ describe("e2e: framework contract through the bin (spec 004)", () => {
 		expectSuccess(result, 0);
 
 		const lines = result.stdout.trimEnd().split("\n");
-		expect(lines).toHaveLength(1);
-		const parsed = JSON.parse(lines[0] as string) as Record<string, unknown>;
-		expect(parsed.rule).toBe("backend-doctor/no-eval");
-		expect(Object.keys(parsed)).not.toContain("frameworks");
+		expect(lines).toHaveLength(2);
+		const parsed = lines.map(
+			(line) => JSON.parse(line) as Record<string, unknown>,
+		);
+		expect(parsed.map((d) => d.rule)).toEqual([
+			"backend-doctor/unused-dependency",
+			"backend-doctor/no-eval",
+		]);
+		expect(Object.keys(parsed[0] as Record<string, unknown>)).not.toContain(
+			"frameworks",
+		);
 	});
 
 	it("two consecutive scans are byte-identical (AC-13)", () => {

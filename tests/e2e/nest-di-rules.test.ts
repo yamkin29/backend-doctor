@@ -234,7 +234,17 @@ describe("e2e: nest DI rules through the bin (spec 009)", () => {
 				9,
 				"backend-doctor/provider-not-registered",
 			],
+			[
+				path.join("src", "x.service.ts"),
+				2,
+				"backend-doctor/circular-dependency",
+			],
 			[path.join("src", "x.service.ts"), 4, "backend-doctor/circular-di"],
+			[
+				path.join("src", "y.service.ts"),
+				2,
+				"backend-doctor/circular-dependency",
+			],
 			[
 				path.join("src", "y.service.ts"),
 				6,

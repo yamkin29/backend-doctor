@@ -125,6 +125,22 @@ describe("e2e: layers & DTO rules through the bin (spec 010)", () => {
 				d.severity,
 			]),
 		).toEqual([
+			// The dto file is imported by nobody: unused export + file
+			// (spec 013 graph findings on the staged tree).
+			[
+				path.join("src", "create-report.dto.ts"),
+				1,
+				1,
+				"backend-doctor/unused-export",
+				"warn",
+			],
+			[
+				path.join("src", "create-report.dto.ts"),
+				1,
+				1,
+				"backend-doctor/unused-file",
+				"warn",
+			],
 			[
 				path.join("src", "create-report.dto.ts"),
 				2,
@@ -222,6 +238,10 @@ describe("e2e: layers & DTO rules through the bin (spec 010)", () => {
 					"backend-doctor/missing-global-validation-pipe": "off",
 					"backend-doctor/dto-field-without-validator": "off",
 					"backend-doctor/no-any-in-dto": "off",
+					// The staged tree also carries graph findings; silence
+					// them so "the whole pack off" stays the empty report.
+					"backend-doctor/unused-export": "off",
+					"backend-doctor/unused-file": "off",
 				},
 			}),
 		);
@@ -252,6 +272,8 @@ describe("e2e: layers & DTO rules through the bin (spec 010)", () => {
 			"backend-doctor/missing-global-validation-pipe",
 			"backend-doctor/dto-field-without-validator",
 			"backend-doctor/no-any-in-dto",
+			"backend-doctor/unused-export",
+			"backend-doctor/unused-file",
 		]);
 		for (const line of lines) {
 			const parsed = JSON.parse(line) as Record<string, unknown>;

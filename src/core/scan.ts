@@ -7,6 +7,7 @@ import {
 	SUPPORTED_EXTENSIONS,
 } from "../engine/collect.js";
 import { TsMorphParserAdapter } from "../engine/parser/ts-morph-adapter.js";
+import { runProjectRules } from "../engine/project-rules.js";
 import { allRules } from "../engine/registry.js";
 import { runRules, sortDiagnostics } from "../engine/runner.js";
 import { detectFrameworks } from "../framework/detect.js";
@@ -89,6 +90,19 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
 		diagnostics.push(...outcome.diagnostics);
 		skippedChecks.push(...outcome.skippedChecks);
 	}
+
+	// Project rules (spec 013): the second rule kind runs once per scan,
+	// after the per-file loop, over the whole analyzed file set.
+	const projectOutcome = runProjectRules({
+		files,
+		config: input.config,
+		adapter,
+		scanRoot: target,
+		detectedFrameworks: detection.frameworks,
+		packageRoot,
+	});
+	diagnostics.push(...projectOutcome.diagnostics);
+	skippedChecks.push(...projectOutcome.skippedChecks);
 
 	const analyzedFiles = files
 		.map((file) => relativeTo(target, file.filePath))

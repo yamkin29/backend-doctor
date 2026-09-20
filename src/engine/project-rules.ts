@@ -253,7 +253,10 @@ export function readPackageJsonSurface(packageRoot: string): {
 }
 
 function failureEntry(filePath: string, reason: string): SkippedCheck {
-	return { check: "package-surface", reason: `${filePath}: ${reason}` };
+	// The surface is always <packageRoot>/package.json, so the basename is
+	// the deterministic, machine-independent form for the report.
+	void filePath;
+	return { check: "package-surface", reason: `package.json: ${reason}` };
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

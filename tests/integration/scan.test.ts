@@ -45,6 +45,22 @@ describe("runScan on the bad-app fixture (AC-8)", () => {
 				"backend-doctor/no-new-func",
 				"Prefer explicit code instead of new Function(); it compiles arbitrary code at runtime.",
 			],
+			// Graph findings (spec 013): nothing reaches util.ts, so its
+			// export is dead too — true positives of the fixture tree.
+			[
+				"src/util.ts",
+				1,
+				1,
+				"backend-doctor/unused-export",
+				"add is exported here but no other file imports it; it is public API nobody uses. Remove the export keyword, inline the code, or delete it.",
+			],
+			[
+				"src/util.ts",
+				1,
+				1,
+				"backend-doctor/unused-file",
+				"No entry point reaches this file through imports; it is compiled and maintained but never runs. Delete it, expose it through an entry, or import it where it is meant to be used.",
+			],
 		]);
 		expect(result.diagnostics.every((d) => d.severity === "warn")).toBe(true);
 	});
@@ -95,6 +111,8 @@ describe("runScan on the bad-app fixture (AC-8)", () => {
 		expect(severities).toEqual({
 			"backend-doctor/no-eval": "error",
 			"backend-doctor/no-new-func": "warn",
+			"backend-doctor/unused-export": "warn",
+			"backend-doctor/unused-file": "warn",
 		});
 	});
 });
@@ -207,6 +225,10 @@ describe("runScan framework detection (AC-1..8, spec 004)", () => {
 					check: "framework-detection",
 					reason: expect.stringContaining("package.json"),
 				},
+				{
+					check: "package-surface",
+					reason: expect.stringContaining("package.json"),
+				},
 			]);
 			expect(result.projects[0]?.complete).toBe(true);
 		} finally {
@@ -247,7 +269,9 @@ describe("runScan fail-soft behavior (AC-2, constitution §8)", () => {
 				"src/index.ts",
 				"src/util.ts",
 			]);
-			expect(result.diagnostics).toHaveLength(2);
+			// no-eval, no-new-func + the graph findings on the unreachable
+			// util.ts (spec 013).
+			expect(result.diagnostics).toHaveLength(4);
 		} finally {
 			fs.chmodSync(path.join(tmp, "src", "secret.ts"), 0o644);
 			fs.rmSync(tmp, { recursive: true, force: true });
@@ -757,7 +781,21 @@ describe("runScan nest DI rules (AC-11, spec 009)", () => {
 					"backend-doctor/provider-not-registered",
 					"warn",
 				],
+				[
+					"src/x.service.ts",
+					2,
+					1,
+					"backend-doctor/circular-dependency",
+					"warn",
+				],
 				["src/x.service.ts", 4, 1, "backend-doctor/circular-di", "warn"],
+				[
+					"src/y.service.ts",
+					2,
+					1,
+					"backend-doctor/circular-dependency",
+					"warn",
+				],
 				[
 					"src/y.service.ts",
 					6,
@@ -784,6 +822,9 @@ describe("runScan nest DI rules (AC-11, spec 009)", () => {
 			fs.writeFileSync(
 				path.join(tmp, "src", "app.ts"),
 				[
+					'import express from "express";',
+					"",
+					"void express;",
 					"function Injectable(): ClassDecorator {",
 					"\treturn () => {};",
 					"}",
@@ -920,6 +961,22 @@ describe("runScan layers & DTO pack (AC-10, AC-11, spec 010)", () => {
 					d.severity,
 				]),
 			).toEqual([
+				// The dto file is imported by nobody: unused export + file
+				// (spec 013 graph findings on the staged tree).
+				[
+					"src/create-report.dto.ts",
+					1,
+					1,
+					"backend-doctor/unused-export",
+					"warn",
+				],
+				[
+					"src/create-report.dto.ts",
+					1,
+					1,
+					"backend-doctor/unused-file",
+					"warn",
+				],
 				[
 					"src/create-report.dto.ts",
 					2,
@@ -1171,6 +1228,11 @@ describe("runScan prisma pack (AC-6, spec 012)", () => {
 				"\t\tawait prisma.user.create({ data: { id: users.length } });",
 				"\t});",
 				"}",
+				// The declared dependency is real in the violating tree: an
+				// import keeps unused-dependency silent (positions unchanged).
+				...(withDependency
+					? ['import type { PrismaClient } from "@prisma/client";']
+					: []),
 			].join("\n"),
 		);
 		return tmp;
@@ -1239,6 +1301,110 @@ describe("runScan prisma pack (AC-6, spec 012)", () => {
 			});
 
 			expect(result.projects[0]?.frameworks).toEqual([]);
+			expect(result.diagnostics).toEqual([]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("runScan graph pack (spec 013, AC-6)", () => {
+	function writeGraphProject(withViolations: boolean): string {
+		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "backend-doctor-graph-"));
+		fs.writeFileSync(
+			path.join(tmp, "package.json"),
+			JSON.stringify(
+				withViolations
+					? {
+							name: "app",
+							scripts: { start: "node dist/main.js" },
+							dependencies: { express: "^4.0.0", "left-pad": "^1.0.0" },
+						}
+					: { name: "app", dependencies: { express: "^4.0.0" } },
+			),
+		);
+		const src = path.join(tmp, "src");
+		fs.mkdirSync(src, { recursive: true });
+		fs.writeFileSync(
+			path.join(src, "main.ts"),
+			['import { start } from "./app";', "", "void start();"].join("\n"),
+		);
+		if (withViolations) {
+			fs.writeFileSync(
+				path.join(src, "app.ts"),
+				[
+					'import express from "express";',
+					'import { helper } from "./helper";',
+					"",
+					"export function start(): string {",
+					"\treturn helper() + express;",
+					"}",
+				].join("\n"),
+			);
+			fs.writeFileSync(
+				path.join(src, "helper.ts"),
+				[
+					'import { start } from "./app";',
+					"",
+					"export function helper(): string {",
+					"\treturn start();",
+					"}",
+				].join("\n"),
+			);
+			fs.writeFileSync(
+				path.join(src, "orphan.ts"),
+				["export function orphan(): number {", "\treturn 1;", "}"].join("\n"),
+			);
+		} else {
+			fs.writeFileSync(
+				path.join(src, "app.ts"),
+				[
+					'import express from "express";',
+					"",
+					"export function start(): string {",
+					"\treturn express;",
+					"}",
+				].join("\n"),
+			);
+		}
+		return tmp;
+	}
+
+	it("reports cycles, orphans, unused exports and dependencies in report order", async () => {
+		const tmp = writeGraphProject(true);
+		try {
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+			expect(
+				result.diagnostics.map((d) => [
+					rel(result, d.filePath),
+					d.line,
+					d.column,
+					d.rule,
+				]),
+			).toEqual([
+				["package.json", 1, 1, "backend-doctor/unused-dependency"],
+				["src/app.ts", 2, 1, "backend-doctor/circular-dependency"],
+				["src/helper.ts", 1, 1, "backend-doctor/circular-dependency"],
+				["src/orphan.ts", 1, 1, "backend-doctor/unused-export"],
+				["src/orphan.ts", 1, 1, "backend-doctor/unused-file"],
+			]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("reports nothing on a clean connected tree", async () => {
+		const tmp = writeGraphProject(false);
+		try {
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
 			expect(result.diagnostics).toEqual([]);
 		} finally {
 			fs.rmSync(tmp, { recursive: true, force: true });

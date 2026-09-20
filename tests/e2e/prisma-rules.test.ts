@@ -3,36 +3,43 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { expectSuccess, makeTmpDir, runCli } from "./helpers.js";
 
-const SERVICE_SOURCE = [
-	"declare function fetch(url: string): Promise<unknown>;",
-	"declare const prisma: {",
-	"\tuser: {",
-	"\t\tfindMany(args?: unknown): Promise<{ id: number }[]>;",
-	"\t\tcreate(args: unknown): Promise<unknown>;",
-	"\t};",
-	"\tpost: { findMany(args: unknown): Promise<unknown[]> };",
-	"\t$queryRawUnsafe(query: string): Promise<unknown[]>;",
-	"\t$transaction(fn: unknown): Promise<unknown>;",
-	"};",
-	"",
-	"export async function load(): Promise<void> {",
-	"\tconst users = await prisma.user.findMany();",
-	"\tfor (const user of users) {",
-	"\t\tconst posts = await prisma.post.findMany({",
-	"\t\t\ttake: 10,",
-	"\t\t\twhere: { userId: user.id },",
-	"\t\t});",
-	"\t\tvoid posts;",
-	"\t}",
-	'\tconst logs = await prisma.$queryRawUnsafe("SELECT * FROM Log WHERE user_id = " + users.length);',
-	"\tvoid logs;",
-	"\tawait prisma.$transaction(async () => {",
-	'\t\tconst profile = await fetch("https://example.com");',
-	"\t\tvoid profile;",
-	"\t\tawait prisma.user.create({ data: { id: users.length } });",
-	"\t});",
-	"}",
-].join("\n");
+function serviceSource(withDependency: boolean): string {
+	// The trailing type-only import keeps unused-dependency silent in the
+	// dependency variant without shifting the pinned violation positions.
+	return [
+		"declare function fetch(url: string): Promise<unknown>;",
+		"declare const prisma: {",
+		"\tuser: {",
+		"\t\tfindMany(args?: unknown): Promise<{ id: number }[]>;",
+		"\t\tcreate(args: unknown): Promise<unknown>;",
+		"\t};",
+		"\tpost: { findMany(args: unknown): Promise<unknown[]> };",
+		"\t$queryRawUnsafe(query: string): Promise<unknown[]>;",
+		"\t$transaction(fn: unknown): Promise<unknown>;",
+		"};",
+		"",
+		"export async function load(): Promise<void> {",
+		"\tconst users = await prisma.user.findMany();",
+		"\tfor (const user of users) {",
+		"\t\tconst posts = await prisma.post.findMany({",
+		"\t\t\ttake: 10,",
+		"\t\t\twhere: { userId: user.id },",
+		"\t\t});",
+		"\t\tvoid posts;",
+		"\t}",
+		'\tconst logs = await prisma.$queryRawUnsafe("SELECT * FROM Log WHERE user_id = " + users.length);',
+		"\tvoid logs;",
+		"\tawait prisma.$transaction(async () => {",
+		'\t\tconst profile = await fetch("https://example.com");',
+		"\t\tvoid profile;",
+		"\t\tawait prisma.user.create({ data: { id: users.length } });",
+		"\t});",
+		"}",
+		...(withDependency
+			? ['import type { PrismaClient } from "@prisma/client";']
+			: []),
+	].join("\n");
+}
 
 const PACK_RULES = [
 	"backend-doctor/find-many-without-pagination",
@@ -52,7 +59,10 @@ function writePrismaApp(withDependency: boolean): string {
 		),
 	);
 	fs.mkdirSync(path.join(app, "src"));
-	fs.writeFileSync(path.join(app, "src", "users.service.ts"), SERVICE_SOURCE);
+	fs.writeFileSync(
+		path.join(app, "src", "users.service.ts"),
+		serviceSource(withDependency),
+	);
 	return app;
 }
 

@@ -5,7 +5,7 @@ import { ConfigError } from "../../config/errors.js";
 import { loadConfig } from "../../config/load.js";
 import { resolveCliOverrides } from "../../config/resolve.js";
 import type { ResolvedConfig } from "../../config/types.js";
-import { allRules } from "../../engine/registry.js";
+import { allProjectRules, allRules } from "../../engine/registry.js";
 // Importing registers the product rules so config validation knows their ids.
 import "../../rules/index.js";
 import { exitCodeFor } from "../../core/exit-code.js";
@@ -20,7 +20,9 @@ export interface ScanCommandOptions {
 	dumpConfig?: boolean;
 }
 
-const REGISTERED_RULE_IDS = new Set(allRules().map((rule) => rule.id));
+const REGISTERED_RULE_IDS = new Set(
+	[...allRules(), ...allProjectRules()].map((rule) => rule.id),
+);
 
 export async function scanCommand(
 	pathArg: string | undefined,

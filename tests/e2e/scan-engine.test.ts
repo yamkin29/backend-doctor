@@ -15,7 +15,8 @@ describe("e2e: scan against the bad-app fixture (AC-7)", () => {
 		expect(result.stdout).toContain("backend-doctor/no-eval");
 		expect(result.stdout).toContain("src/index.ts:4:17");
 		expect(result.stdout).toContain("backend-doctor/no-new-func");
-		expect(result.stdout).toContain("2 warnings");
+		// + the graph findings on the unreachable util.ts (spec 013).
+		expect(result.stdout).toContain("4 warnings");
 	});
 
 	it("json report carries diagnostics[] and the projects[] shape (AC-8)", () => {
@@ -27,7 +28,7 @@ describe("e2e: scan against the bad-app fixture (AC-7)", () => {
 			projects: Array<Record<string, unknown>>;
 		};
 
-		expect(doc.diagnostics).toHaveLength(2);
+		expect(doc.diagnostics).toHaveLength(4);
 		for (const d of doc.diagnostics) {
 			expect(Object.keys(d).sort()).toEqual(
 				[
@@ -47,6 +48,9 @@ describe("e2e: scan against the bad-app fixture (AC-7)", () => {
 		expect(doc.diagnostics.map((d) => d.rule)).toEqual([
 			"backend-doctor/no-eval",
 			"backend-doctor/no-new-func",
+			// The graph findings on the unreachable util.ts (spec 013).
+			"backend-doctor/unused-export",
+			"backend-doctor/unused-file",
 		]);
 
 		expect(doc.projects).toEqual([
@@ -66,11 +70,13 @@ describe("e2e: scan against the bad-app fixture (AC-7)", () => {
 		expectSuccess(result, 0);
 
 		const lines = result.stdout.trimEnd().split("\n");
-		expect(lines).toHaveLength(2);
+		expect(lines).toHaveLength(4);
 		const parsed = lines.map((line) => JSON.parse(line) as { rule: string });
 		expect(parsed.map((d) => d.rule)).toEqual([
 			"backend-doctor/no-eval",
 			"backend-doctor/no-new-func",
+			"backend-doctor/unused-export",
+			"backend-doctor/unused-file",
 		]);
 	});
 
