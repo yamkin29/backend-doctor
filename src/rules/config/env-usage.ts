@@ -35,7 +35,7 @@ function isDirectEnvAccess(node: Node): boolean {
 	const element = node.asKind(SyntaxKind.ElementAccessExpression);
 	if (element) {
 		const argument = element.getArgumentExpression();
-		if (!argument || !argument.asKind(SyntaxKind.StringLiteral)) return false;
+		if (!argument?.asKind(SyntaxKind.StringLiteral)) return false;
 		return isProcessEnvBase(element.getExpression());
 	}
 	return false;
