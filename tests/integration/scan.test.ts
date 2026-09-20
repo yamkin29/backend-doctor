@@ -513,3 +513,130 @@ describe("runScan security rules (AC-14, spec 007)", () => {
 		}
 	});
 });
+
+describe("runScan nest app model (AC-7, AC-10, spec 008)", () => {
+	function makeProject(): string {
+		return fs.mkdtempSync(path.join(os.tmpdir(), "backend-doctor-nest-"));
+	}
+
+	it("exposes projects[0].nest for nest projects (AC-7)", async () => {
+		const tmp = makeProject();
+		try {
+			fs.writeFileSync(
+				path.join(tmp, "package.json"),
+				JSON.stringify({
+					name: "app",
+					dependencies: { "@nestjs/common": "^10.0.0" },
+				}),
+			);
+			fs.mkdirSync(path.join(tmp, "src"));
+			fs.writeFileSync(
+				path.join(tmp, "src", "app.module.ts"),
+				[
+					'import { Module } from "@nestjs/common";',
+					'import { AppService } from "./app.service.js";',
+					"",
+					"@Module({",
+					"\tproviders: [AppService],",
+					"})",
+					"export class AppModule {}",
+				].join("\n"),
+			);
+			fs.writeFileSync(
+				path.join(tmp, "src", "app.service.ts"),
+				[
+					'import { Injectable } from "@nestjs/common";',
+					"",
+					"@Injectable()",
+					"export class AppService {}",
+				].join("\n"),
+			);
+
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(result.projects[0]?.frameworks).toEqual(["nest"]);
+			expect(result.projects[0]?.nest).toEqual({
+				modules: [
+					expect.objectContaining({
+						className: "AppModule",
+						imports: [],
+						providers: ["AppService"],
+						controllers: [],
+						exports: [],
+					}),
+				],
+				controllers: [],
+				providers: [expect.objectContaining({ className: "AppService" })],
+				dtos: [],
+				unresolved: [],
+			});
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("omits the nest field for non-nest projects (AC-7)", async () => {
+		const tmp = makeProject();
+		try {
+			fs.writeFileSync(
+				path.join(tmp, "package.json"),
+				JSON.stringify({ name: "app", dependencies: { express: "^4.19.2" } }),
+			);
+			fs.mkdirSync(path.join(tmp, "src"));
+			fs.writeFileSync(
+				path.join(tmp, "src", "main.ts"),
+				"export const x = 1;\n",
+			);
+
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			const project = result.projects[0];
+			expect(project?.nest).toBeUndefined();
+			expect(Object.keys(project ?? {})).not.toContain("nest");
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("exposes the all-empty model when a nest tree has no decorators (AC-10)", async () => {
+		const tmp = makeProject();
+		try {
+			fs.writeFileSync(
+				path.join(tmp, "package.json"),
+				JSON.stringify({
+					name: "app",
+					dependencies: { "@nestjs/common": "^10.0.0" },
+				}),
+			);
+			fs.mkdirSync(path.join(tmp, "src"));
+			fs.writeFileSync(
+				path.join(tmp, "src", "util.ts"),
+				"export const x = 1;\n",
+			);
+
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(result.projects[0]?.nest).toEqual({
+				modules: [],
+				controllers: [],
+				providers: [],
+				dtos: [],
+				unresolved: [],
+			});
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+});

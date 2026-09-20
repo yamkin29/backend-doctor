@@ -1,3 +1,4 @@
+import type { SkippedCheck } from "../../core/types.js";
 import {
 	type ArrayLiteralExpression,
 	type ClassDeclaration,
@@ -363,4 +364,33 @@ function compareUnresolved(a: NestUnresolvedRef, b: NestUnresolvedRef): number {
 	if (a.filePath !== b.filePath) return a.filePath < b.filePath ? -1 : 1;
 	if (a.line !== b.line) return a.line - b.line;
 	return a.column - b.column;
+}
+
+export interface NestModelBuildResult {
+	/** The extracted model; absent when extraction failed. */
+	model?: NestAppModel;
+	/** Constitution §8 record for a crashed extraction. */
+	failure?: SkippedCheck;
+}
+
+/**
+ * Crash isolation for the scan pipeline: a program-level extraction bug
+ * becomes a skippedChecks entry instead of a failed scan. Per-decorator
+ * problems never reach this path — they land in `unresolved` during
+ * extraction.
+ */
+export function buildNestModelOrSkip(
+	files: readonly SourceFileView[],
+	adapter: ParserAdapter,
+): NestModelBuildResult {
+	try {
+		return { model: extractNestAppModel(files, adapter) };
+	} catch (error) {
+		return {
+			failure: {
+				check: "nest-app-model",
+				reason: `extraction failed — ${(error as Error).message}`,
+			},
+		};
+	}
 }

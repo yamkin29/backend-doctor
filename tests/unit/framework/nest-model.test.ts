@@ -5,7 +5,11 @@ import {
 	SUPPORTED_EXTENSIONS,
 } from "../../../src/engine/collect.js";
 import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapter.js";
-import { extractNestAppModel } from "../../../src/framework/nest/extract.js";
+import type { ParserAdapter } from "../../../src/engine/parser/types.js";
+import {
+	buildNestModelOrSkip,
+	extractNestAppModel,
+} from "../../../src/framework/nest/extract.js";
 
 const FIXTURE_ROOT = path.resolve(import.meta.dirname, "../../fixtures/nest");
 const APP_ROOT = path.join(FIXTURE_ROOT, "model-app");
@@ -213,5 +217,46 @@ describe("nest model: determinism and empty model (AC-8, AC-10)", () => {
 		const sorted = extractModel();
 		const reversed = extractModel(true);
 		expect(reversed).toEqual(sorted);
+	});
+});
+
+describe("nest model: crash isolation (AC-9)", () => {
+	it("turns an extraction crash into a skippedChecks failure (AC-9)", () => {
+		const realAdapter = new TsMorphParserAdapter();
+		const paths = collectFiles({
+			target: APP_ROOT,
+			extensions: SUPPORTED_EXTENSIONS,
+			excludes: [],
+			ignoreGlobs: [],
+		});
+		const { files } = realAdapter.createProject(paths);
+		const throwing: ParserAdapter = {
+			name: "throwing",
+			createProject: realAdapter.createProject.bind(realAdapter),
+			positionOf: () => {
+				throw new Error("boom");
+			},
+		};
+
+		const { model, failure } = buildNestModelOrSkip(files, throwing);
+
+		expect(model).toBeUndefined();
+		expect(failure).toEqual({
+			check: "nest-app-model",
+			reason: expect.stringContaining("boom"),
+		});
+	});
+
+	it("returns the model untouched when extraction succeeds", () => {
+		const realAdapter = new TsMorphParserAdapter();
+		const { model, failure } = buildNestModelOrSkip([], realAdapter);
+		expect(failure).toBeUndefined();
+		expect(model).toEqual({
+			modules: [],
+			controllers: [],
+			providers: [],
+			dtos: [],
+			unresolved: [],
+		});
 	});
 });

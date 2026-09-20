@@ -13,6 +13,7 @@ import {
 	type RuleDefinition,
 } from "../../../src/engine/registry.js";
 import { runRules, sortDiagnostics } from "../../../src/engine/runner.js";
+import type { NestAppModel } from "../../../src/framework/nest/model.js";
 
 /** Minimal in-memory view — enough for spy rules that report fixed positions. */
 class FakeView implements SourceFileView {
@@ -398,5 +399,48 @@ describe("sortDiagnostics (AC-10 ordering)", () => {
 		expect(sortDiagnostics(diagnostics, scanRoot)).toEqual(
 			sortDiagnostics(diagnostics, scanRoot),
 		);
+	});
+});
+
+describe("nest model passthrough (AC-11, spec 008)", () => {
+	const emptyModel: NestAppModel = {
+		modules: [],
+		controllers: [],
+		providers: [],
+		dtos: [],
+		unresolved: [],
+	};
+
+	it("exposes the model to rules via ctx.nest (AC-11)", () => {
+		let observed: NestAppModel | undefined;
+		const spy = rule("backend-doctor/spy-nest", (ctx) => {
+			observed = ctx.nest;
+		});
+		runRules({
+			file: new FakeView(path.join(scanRoot, "src/a.ts")),
+			rules: [spy],
+			config: config(),
+			adapter: fakeAdapter,
+			scanRoot,
+			detectedFrameworks: ["nest"],
+			nestModel: emptyModel,
+		});
+		expect(observed).toBe(emptyModel);
+	});
+
+	it("leaves ctx.nest undefined when no model was built (AC-11)", () => {
+		let observed: NestAppModel | undefined | "unset" = "unset";
+		const spy = rule("backend-doctor/spy-nest", (ctx) => {
+			observed = ctx.nest;
+		});
+		runRules({
+			file: new FakeView(path.join(scanRoot, "src/a.ts")),
+			rules: [spy],
+			config: config(),
+			adapter: fakeAdapter,
+			scanRoot,
+			detectedFrameworks: ["nest"],
+		});
+		expect(observed).toBeUndefined();
 	});
 });

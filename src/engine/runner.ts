@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { ResolvedConfig } from "../config/types.js";
 import type { Diagnostic, SkippedCheck } from "../core/types.js";
+import type { NestAppModel } from "../framework/nest/model.js";
 import { createDiagnosticId } from "./diagnostic-id.js";
 import type {
 	ParserAdapter,
@@ -20,6 +21,8 @@ export interface RunRulesOptions {
 	scanRoot: string;
 	/** Framework ids detected for the project (spec 004 pack gate). */
 	detectedFrameworks: readonly string[];
+	/** Nest application model (spec 008), built once per scan for nest projects. */
+	nestModel?: NestAppModel;
 }
 
 export interface RuleRunOutcome {
@@ -65,6 +68,7 @@ export function runRules(opts: RunRulesOptions): RuleRunOutcome {
 		const findings: ReportInput[] = [];
 		const ctx: RuleContext = {
 			file,
+			nest: opts.nestModel,
 			report: (input) => {
 				findings.push(input);
 			},

@@ -1,5 +1,7 @@
 export type Severity = "error" | "warn";
 
+import type { NestAppModel } from "../framework/nest/model.js";
+
 export const DIAGNOSTIC_CATEGORIES = [
 	"Bugs",
 	"Correctness",
@@ -48,6 +50,11 @@ export interface ProjectInfo {
 	analyzedFileCount: number;
 	complete: boolean;
 	skippedChecks: SkippedCheck[];
+	/**
+	 * Nest application model (spec 008); present only when the `nest`
+	 * framework was detected and extraction succeeded.
+	 */
+	nest?: NestAppModel;
 }
 
 export interface ReportDocument {

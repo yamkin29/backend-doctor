@@ -10,6 +10,8 @@ import { TsMorphParserAdapter } from "../engine/parser/ts-morph-adapter.js";
 import { allRules } from "../engine/registry.js";
 import { runRules, sortDiagnostics } from "../engine/runner.js";
 import { detectFrameworks } from "../framework/detect.js";
+import { buildNestModelOrSkip } from "../framework/nest/extract.js";
+import type { NestAppModel } from "../framework/nest/model.js";
 // Importing registers the product rules (src/rules/index.ts is the explicit,
 // greppable registry — see design 003).
 import "../rules/index.js";
@@ -65,6 +67,15 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
 	});
 	skippedChecks.push(...detection.skippedChecks);
 
+	// Nest app model (spec 008): built once for nest projects; a crashing
+	// extraction is reported instead of failing the scan (constitution §8).
+	let nestModel: NestAppModel | undefined;
+	if (detection.frameworks.includes("nest")) {
+		const built = buildNestModelOrSkip(files, adapter);
+		nestModel = built.model;
+		if (built.failure) skippedChecks.push(built.failure);
+	}
+
 	for (const file of files) {
 		const outcome = runRules({
 			file,
@@ -73,6 +84,7 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
 			adapter,
 			scanRoot: target,
 			detectedFrameworks: detection.frameworks,
+			nestModel,
 		});
 		diagnostics.push(...outcome.diagnostics);
 		skippedChecks.push(...outcome.skippedChecks);
@@ -82,16 +94,19 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
 		.map((file) => relativeTo(target, file.filePath))
 		.sort();
 
-	const projects: ProjectInfo[] = [
-		{
-			packageRoot,
-			frameworks: detection.frameworks,
-			analyzedFiles,
-			analyzedFileCount: analyzedFiles.length,
-			complete: true,
-			skippedChecks,
-		},
-	];
+	// The key is added only when the model exists, so non-nest reports carry
+	// no nest field at all (spec 008 AC-7).
+	const project: ProjectInfo = {
+		packageRoot,
+		frameworks: detection.frameworks,
+		analyzedFiles,
+		analyzedFileCount: analyzedFiles.length,
+		complete: true,
+		skippedChecks,
+	};
+	if (nestModel) project.nest = nestModel;
+
+	const projects: ProjectInfo[] = [project];
 
 	return { input, diagnostics: sortDiagnostics(diagnostics, target), projects };
 }
