@@ -253,3 +253,29 @@ Under interop, a module **without** a default export exposes a *virtual*
 - Their rule objects: `defineRule` with `id`, `title`, `severity`, `recommendation`,
   `create` (AST visitors) or `scan(file)` (whole-tree findings) — two rule kinds.
   We mirror this: AST rules via the adapter now, scan/graph rules from F013.
+
+### Config/env pack (spec 014)
+
+- **The repo `.gitignore` ignores `.env` and `.env.*` at every depth.**
+  Fixture dotenv files under `tests/fixtures/` must be staged with
+  `git add -f` — a plain `git add` silently skips them and CI fails on a
+  fresh clone. zsh note: globs do not match dotfiles, so add the fixture
+  directory (`git add -f <dir>/`), not `.env*`.
+- **vitest collected a fixture named `*.test.ts` as a test suite** ("No
+  test suite found") — `include: ["tests/**/*.test.ts"]` reaches into
+  `tests/fixtures/`. `vitest.config.ts` now has
+  `exclude: ["tests/fixtures/**", ...defaultExclude]` (setting `exclude`
+  replaces vitest's defaults, hence the `...defaultExclude` spread).
+- **picomatch globstar-vs-root behavior is not assumed in the gitignore
+  matcher:** `isCoveredByGitignore` tries the pattern directly and with a
+  globstar prefix, so a `**/.env` line covers a root-level `.env`
+  regardless of how picomatch treats a bare basename against a
+  globstar pattern.
+- **A `*/` sequence inside a block comment terminates the comment** — a
+  backtick-quoted `` `**/` `` in a doc comment broke esbuild's transform
+  (bit spec 014 T1). Write such sequences as prose ("globstar-prefixed")
+  inside comments.
+- **`RuleContext` now carries `relativePath`** (target-relative posix,
+  precomputed in `runner.ts`): path-shape rules need the scan-relative
+  path and rules have no other way to get it. Project rules already had
+  `project.relativePath()`.

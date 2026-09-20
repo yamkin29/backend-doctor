@@ -1,6 +1,6 @@
 # Spec 014 — Config & env rules (F014)
 
-- **Status:** Approved (2026-09-20)
+- **Status:** Implemented (2026-09-20)
 - **Phase:** 3 — Project-level (opt-in, full scan)
 - **Depends on:** F003 (engine core: adapter, registry, runner, report) —
   Done; F013 (project rule kind, package-surface reading precedent) — Done;
@@ -22,6 +22,13 @@ documented FP risk for F022 to gate; (4) `no-committed-env` covers the
 8-name dotenv candidate set at the package root with the approximate
 picomatch-based gitignore matcher; (5) no new dependencies; (6) categories
 Configuration / Configuration / Security.
+
+Implementation note (recorded at close-out, 2026-09-20): the planned
+type-only `ElementAccessExpression` re-export proved unnecessary —
+`node.asKind(SyntaxKind.ElementAccessExpression)` narrows without a named
+import, so the parser boundary did not grow. The `process.env["…"]` shape
+is still detected and tested (AC-1 unchanged). `RuleContext` grew
+`relativePath` instead (engine-internal, design 014 decision 1).
 
 ## Problem
 
