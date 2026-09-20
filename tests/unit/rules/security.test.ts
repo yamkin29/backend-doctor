@@ -14,6 +14,7 @@ import { noEval } from "../../../src/rules/security/no-eval.js";
 import { noHardcodedSecrets } from "../../../src/rules/security/no-hardcoded-secrets.js";
 import { noNewFunc } from "../../../src/rules/security/no-new-func.js";
 import { noPathTraversal } from "../../../src/rules/security/no-path-traversal.js";
+import { noWeakCrypto } from "../../../src/rules/security/no-weak-crypto.js";
 
 const FIXTURE_ROOT = path.resolve(
 	import.meta.dirname,
@@ -27,6 +28,7 @@ const rules: Record<string, RuleDefinition> = {
 	"no-command-injection": noCommandInjection,
 	"no-path-traversal": noPathTraversal,
 	"no-hardcoded-secrets": noHardcodedSecrets,
+	"no-weak-crypto": noWeakCrypto,
 };
 
 /** Runs one rule over a fixture directory using the real parser adapter. */
@@ -261,5 +263,53 @@ describe("backend-doctor/no-hardcoded-secrets (AC-5..6)", () => {
 		expect(
 			scanFixture("no-hardcoded-secrets", "no-hardcoded-secrets/valid"),
 		).toEqual([]);
+	});
+});
+
+describe("backend-doctor/no-weak-crypto (AC-7..8)", () => {
+	const message =
+		"MD5 and SHA-1 are broken for security uses such as signatures, passwords and tokens. Use SHA-256 or stronger; for non-security checksums, downgrade or ignore this rule.";
+
+	it("flags md5/sha1 hash algorithms with exact diagnostics, top level too (AC-7)", () => {
+		expect(
+			summarize(scanFixture("no-weak-crypto", "no-weak-crypto/invalid")),
+		).toEqual([
+			{
+				file: path.join("no-weak-crypto", "invalid", "md5-literal.ts"),
+				line: 4,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-weak-crypto", "invalid", "sha1-property.ts"),
+				line: 4,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-weak-crypto", "invalid", "top-level.ts"),
+				line: 3,
+				column: 21,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-weak-crypto", "invalid", "uppercase-md5.ts"),
+				line: 4,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+		]);
+	});
+
+	it("stays silent on strong and non-literal algorithms and non-crypto files (AC-8)", () => {
+		expect(scanFixture("no-weak-crypto", "no-weak-crypto/valid")).toEqual([]);
 	});
 });
