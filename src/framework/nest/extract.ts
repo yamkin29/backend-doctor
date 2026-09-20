@@ -6,6 +6,7 @@ import {
 	type MethodDeclaration,
 	Node,
 	type ObjectLiteralExpression,
+	type ParameterDeclaration,
 	type ParserAdapter,
 	type SourceFileView,
 	SyntaxKind,
@@ -16,6 +17,7 @@ import type {
 	NestDtoEntry,
 	NestHandlerEntry,
 	NestHttpVerb,
+	NestInjectionRef,
 	NestModuleEntry,
 	NestProviderEntry,
 	NestUnresolvedRef,
@@ -49,6 +51,23 @@ const DTO_DECORATORS = new Set([
 	"OmitType",
 	"IntersectionType",
 ]);
+
+/** `Scope.REQUEST`-style trailing names → model scope values. */
+const SCOPE_ENUM_NAMES = {
+	REQUEST: "request",
+	DEFAULT: "singleton",
+	TRANSIENT: "transient",
+} as const;
+
+/** String-literal scope values → model scope values. */
+const SCOPE_LITERALS = {
+	request: "request",
+	singleton: "singleton",
+	transient: "transient",
+} as const;
+
+/** A bare identifier: the only parameter type shape that reads as a class. */
+const IDENTIFIER_TYPE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
 /**
  * Extracts the Nest application model (spec 008). Decorator-derived entries
@@ -96,8 +115,13 @@ export function extractNestAppModel(
 						readController(cls, className, controllerDecorator, file, adapter),
 					);
 				}
-				if (findClassDecorator(cls, "Injectable")) {
-					providers.push(nodeEntry(cls, className, file, adapter));
+				const injectableDecorator = findClassDecorator(cls, "Injectable");
+				if (injectableDecorator) {
+					providers.push({
+						...nodeEntry(cls, className, file, adapter),
+						scope: readScope(injectableDecorator),
+						injections: readInjections(cls, file, adapter),
+					});
 				}
 			}
 			const via = recognizeDto(cls, className);
@@ -158,10 +182,13 @@ function readModule(
 		providers: [],
 		controllers: [],
 		exports: [],
+		hasUnresolved: false,
+		global: findClassDecorator(cls, "Global") !== undefined,
 	};
 	const call = decorator.getCallExpression();
 	const metadata = call?.getArguments()[0];
 	if (!metadata || !Node.isObjectLiteralExpression(metadata)) {
+		entry.hasUnresolved = true;
 		unresolved.push(
 			unresolvedRef(
 				metadata ?? decorator,
@@ -175,6 +202,7 @@ function readModule(
 	for (const prop of metadata.getProperties()) {
 		if (!Node.isPropertyAssignment(prop)) {
 			if (Node.isSpreadAssignment(prop)) {
+				entry.hasUnresolved = true;
 				unresolved.push(
 					unresolvedRef(
 						prop,
@@ -190,12 +218,20 @@ function readModule(
 		if (!isModuleListKey(key)) continue;
 		const value = prop.getInitializer();
 		if (!value || !Node.isArrayLiteralExpression(value)) {
+			entry.hasUnresolved = true;
 			unresolved.push(
 				unresolvedRef(prop, file, adapter, `"${key}" is not a static array`),
 			);
 			continue;
 		}
-		entry[key] = readReferenceArray(value, key, file, adapter, unresolved);
+		entry[key] = readReferenceArray(
+			value,
+			entry,
+			key,
+			file,
+			adapter,
+			unresolved,
+		);
 	}
 	return entry;
 }
@@ -263,6 +299,7 @@ function readController(
 		column: position.column,
 		route: decoratorStringArgument(decorator),
 		handlers,
+		injections: readInjections(cls, file, adapter),
 	};
 }
 
@@ -286,6 +323,7 @@ function decoratorStringArgument(decorator: Decorator): string | null {
 /** Identifier elements verbatim; object literals via their readable class reference. */
 function readReferenceArray(
 	array: ArrayLiteralExpression,
+	module: NestModuleEntry,
 	listName: ModuleListKey,
 	file: SourceFileView,
 	adapter: ParserAdapter,
@@ -302,6 +340,7 @@ function readReferenceArray(
 			if (classRef !== undefined) {
 				names.push(classRef);
 			} else {
+				module.hasUnresolved = true;
 				unresolved.push(
 					unresolvedRef(
 						element,
@@ -317,23 +356,102 @@ function readReferenceArray(
 			element.getKind() === SyntaxKind.SpreadElement
 				? `spread element in ${listName} array`
 				: `non-identifier element in ${listName} array`;
+		module.hasUnresolved = true;
 		unresolved.push(unresolvedRef(element, file, adapter, reason));
 	}
 	return names;
 }
 
-/** `useClass` / `useExisting` identifier values are the readable references. */
+/** `useClass` / `useExisting` / `module` identifier values are the readable references. */
 function readableClassReference(
 	element: ObjectLiteralExpression,
 ): string | undefined {
 	for (const prop of element.getProperties()) {
 		if (!Node.isPropertyAssignment(prop)) continue;
 		const name = prop.getName();
-		if (name !== "useClass" && name !== "useExisting") continue;
+		if (name !== "useClass" && name !== "useExisting" && name !== "module") {
+			continue;
+		}
 		const value = prop.getInitializer();
 		if (value && Node.isIdentifier(value)) return value.getText();
 	}
 	return undefined;
+}
+
+/** Provider scope from the `@Injectable({ scope: … })` argument; null when unreadable. */
+function readScope(decorator: Decorator): NestProviderEntry["scope"] {
+	const argument = decorator.getCallExpression()?.getArguments()[0];
+	if (!argument || !Node.isObjectLiteralExpression(argument)) return null;
+	for (const prop of argument.getProperties()) {
+		if (!Node.isPropertyAssignment(prop) || prop.getName() !== "scope") {
+			continue;
+		}
+		const value = prop.getInitializer();
+		if (Node.isStringLiteral(value)) {
+			const literal = value.getLiteralText() as keyof typeof SCOPE_LITERALS;
+			return SCOPE_LITERALS[literal] ?? null;
+		}
+		if (Node.isPropertyAccessExpression(value)) {
+			const enumName = value.getName();
+			return (
+				SCOPE_ENUM_NAMES[enumName as keyof typeof SCOPE_ENUM_NAMES] ?? null
+			);
+		}
+		return null;
+	}
+	return null;
+}
+
+/** Constructor DI edges: identifier-typed, non-`@Optional` params, source order. */
+function readInjections(
+	cls: ClassDeclaration,
+	file: SourceFileView,
+	adapter: ParserAdapter,
+): NestInjectionRef[] {
+	const ctor = cls.getConstructors()[0];
+	if (!ctor) return [];
+	const injections: NestInjectionRef[] = [];
+	for (const parameter of ctor.getParameters()) {
+		if (hasParameterDecorator(parameter, "Optional")) continue;
+		const typeNode = parameter.getTypeNode();
+		if (!typeNode) continue;
+		const name = typeNode.getText();
+		if (!IDENTIFIER_TYPE.test(name)) continue;
+		const position = adapter.positionOf(file, parameter.getStart());
+		injections.push({
+			name,
+			forwardRef: isForwardRefInjection(parameter),
+			line: position.line,
+			column: position.column,
+		});
+	}
+	return injections;
+}
+
+function hasParameterDecorator(
+	parameter: ParameterDeclaration,
+	name: string,
+): boolean {
+	return parameter
+		.getDecorators()
+		.some((decorator) => decoratorName(decorator) === name);
+}
+
+/** True when a parameter decorator is `@Inject(forwardRef(() => X))`. */
+function isForwardRefInjection(parameter: ParameterDeclaration): boolean {
+	for (const decorator of parameter.getDecorators()) {
+		if (decoratorName(decorator) !== "Inject") continue;
+		const argument = decorator.getCallExpression()?.getArguments()[0];
+		if (!argument || !Node.isCallExpression(argument)) continue;
+		const target = argument.getExpression();
+		const name = Node.isIdentifier(target)
+			? target.getText()
+			: Node.isPropertyAccessExpression(target)
+				? target.getName()
+				: undefined;
+		if (name === "forwardRef") return true;
+	}
+	return false;
 }
 
 function compareEntries(

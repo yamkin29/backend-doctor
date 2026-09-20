@@ -20,6 +20,7 @@ export type {
 	MethodDeclaration,
 	NewExpression,
 	ObjectLiteralExpression,
+	ParameterDeclaration,
 	PropertyAccessExpression,
 	PropertyAssignment,
 	SpreadElement,

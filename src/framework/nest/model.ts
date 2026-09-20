@@ -31,6 +31,10 @@ export interface NestModuleEntry extends NestModelNode {
 	providers: string[];
 	controllers: string[];
 	exports: string[];
+	/** True when any metadata list of this module produced an unresolved entry. */
+	hasUnresolved: boolean;
+	/** The class carries a @Global decorator. */
+	global: boolean;
 }
 
 export interface NestHandlerEntry {
@@ -46,9 +50,31 @@ export interface NestControllerEntry extends NestModelNode {
 	/** First string-literal argument of @Controller; null when absent. */
 	route: string | null;
 	handlers: NestHandlerEntry[];
+	/** Constructor DI edges in source order (@Optional params excluded). */
+	injections: NestInjectionRef[];
 }
 
-export interface NestProviderEntry extends NestModelNode {}
+/** One constructor DI edge of a provider or controller class. */
+export interface NestInjectionRef {
+	/** Parameter type name as written (identifier only; other types skipped). */
+	name: string;
+	/** True when the parameter carries @Inject(forwardRef(() => X)). */
+	forwardRef: boolean;
+	/** 1-based position of the parameter, adapter-resolved at extraction. */
+	line: number;
+	column: number;
+}
+
+export interface NestProviderEntry extends NestModelNode {
+	/**
+	 * Decorator scope; null when absent or not statically readable. The safe
+	 * default for consumers of this field (request-scoped rules treat null as
+	 * non-request).
+	 */
+	scope: "request" | "transient" | "singleton" | null;
+	/** Constructor DI edges in source order (@Optional params excluded). */
+	injections: NestInjectionRef[];
+}
 
 export interface NestDtoEntry extends NestModelNode {
 	/** How the class was recognized: name suffix or pinned decorator. */

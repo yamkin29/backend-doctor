@@ -13,13 +13,15 @@ import {
 
 const FIXTURE_ROOT = path.resolve(import.meta.dirname, "../../fixtures/nest");
 const APP_ROOT = path.join(FIXTURE_ROOT, "model-app");
+const EXT_ROOT = path.join(FIXTURE_ROOT, "di-rules", "model-extensions");
 
 /** Runs the real extractor over the committed fixture app. */
 function extractModel(
+	root = APP_ROOT,
 	reverseFiles = false,
 ): ReturnType<typeof extractNestAppModel> {
 	const paths = collectFiles({
-		target: APP_ROOT,
+		target: root,
 		extensions: SUPPORTED_EXTENSIONS,
 		excludes: [],
 		ignoreGlobs: [],
@@ -45,6 +47,8 @@ describe("nest model: modules (AC-1, AC-6)", () => {
 				providers: ["UsersService"],
 				controllers: ["UsersController"],
 				exports: [],
+				global: false,
+				hasUnresolved: false,
 			},
 			{
 				filePath: path.join(APP_ROOT, "dynamic", "dynamic.module.ts"),
@@ -55,6 +59,8 @@ describe("nest model: modules (AC-1, AC-6)", () => {
 				providers: [],
 				controllers: [],
 				exports: [],
+				global: false,
+				hasUnresolved: true,
 			},
 			{
 				filePath: path.join(APP_ROOT, "dynamic", "dynamic.module.ts"),
@@ -65,6 +71,8 @@ describe("nest model: modules (AC-1, AC-6)", () => {
 				providers: [],
 				controllers: [],
 				exports: [],
+				global: false,
+				hasUnresolved: true,
 			},
 			{
 				filePath: path.join(APP_ROOT, "users", "users.module.ts"),
@@ -75,6 +83,8 @@ describe("nest model: modules (AC-1, AC-6)", () => {
 				providers: ["UsersService", "UsersService"],
 				controllers: [],
 				exports: ["UsersService"],
+				global: false,
+				hasUnresolved: true,
 			},
 		]);
 	});
@@ -99,6 +109,7 @@ describe("nest model: controllers (AC-2)", () => {
 				handlers: [
 					{ name: "ping", verb: "all", path: null, line: 5, column: 2 },
 				],
+				injections: [],
 			},
 			{
 				filePath: path.join(APP_ROOT, "users", "users.controller.ts"),
@@ -110,6 +121,14 @@ describe("nest model: controllers (AC-2)", () => {
 					{ name: "list", verb: "get", path: null, line: 8, column: 2 },
 					{ name: "one", verb: "get", path: ":id", line: 13, column: 2 },
 					{ name: "create", verb: "post", path: null, line: 18, column: 2 },
+				],
+				injections: [
+					{
+						name: "UsersService",
+						forwardRef: false,
+						line: 6,
+						column: 14,
+					},
 				],
 			},
 		]);
@@ -125,6 +144,8 @@ describe("nest model: providers (AC-3)", () => {
 				className: "UsersService",
 				line: 3,
 				column: 1,
+				scope: null,
+				injections: [],
 			},
 		]);
 	});
@@ -201,6 +222,135 @@ describe("nest model: unresolved references (AC-5)", () => {
 	});
 });
 
+describe("nest model: DI extensions (spec 009 AC-1..5)", () => {
+	it("captures scope, injections, @Global and hasUnresolved (AC-1..4)", () => {
+		const model = extractModel(EXT_ROOT);
+		expect(model.modules).toEqual([
+			{
+				filePath: path.join(EXT_ROOT, "app.module.ts"),
+				className: "AppModule",
+				line: 13,
+				column: 1,
+				imports: ["LegacyModule", "SharedModule"],
+				providers: ["CurrentUserService"],
+				controllers: ["ProfileController"],
+				exports: [],
+				global: true,
+				hasUnresolved: true,
+			},
+			{
+				filePath: path.join(EXT_ROOT, "legacy.module.ts"),
+				className: "LegacyModule",
+				line: 6,
+				column: 1,
+				imports: [],
+				providers: ["LegacyService"],
+				controllers: [],
+				exports: ["LegacyService"],
+				global: false,
+				hasUnresolved: true,
+			},
+			{
+				filePath: path.join(EXT_ROOT, "shared.module.ts"),
+				className: "SharedModule",
+				line: 6,
+				column: 1,
+				imports: [],
+				providers: ["SharedService"],
+				controllers: [],
+				exports: [],
+				global: false,
+				hasUnresolved: false,
+			},
+		]);
+		expect(model.providers).toEqual([
+			{
+				filePath: path.join(EXT_ROOT, "audit.service.ts"),
+				className: "AuditService",
+				line: 3,
+				column: 1,
+				scope: "singleton",
+				injections: [
+					{
+						name: "ArchiveService",
+						forwardRef: true,
+						line: 6,
+						column: 3,
+					},
+				],
+			},
+			{
+				filePath: path.join(EXT_ROOT, "current-user.service.ts"),
+				className: "CurrentUserService",
+				line: 4,
+				column: 1,
+				scope: "request",
+				injections: [
+					{
+						name: "LegacyService",
+						forwardRef: false,
+						line: 6,
+						column: 14,
+					},
+				],
+			},
+			{
+				filePath: path.join(EXT_ROOT, "legacy.service.ts"),
+				className: "LegacyService",
+				line: 3,
+				column: 1,
+				scope: null,
+				injections: [],
+			},
+			{
+				filePath: path.join(EXT_ROOT, "shared.module.ts"),
+				className: "SharedService",
+				line: 3,
+				column: 1,
+				scope: null,
+				injections: [],
+			},
+		]);
+	});
+
+	it("excludes @Optional parameters and keeps the module key capture (AC-2, AC-5)", () => {
+		const { controllers, modules } = extractModel(EXT_ROOT);
+		expect(controllers).toEqual([
+			{
+				filePath: path.join(EXT_ROOT, "profile.controller.ts"),
+				className: "ProfileController",
+				line: 3,
+				column: 1,
+				route: "profile",
+				handlers: [{ name: "me", verb: "get", path: null, line: 7, column: 2 }],
+				injections: [],
+			},
+		]);
+		const app = modules.find((m) => m.className === "AppModule");
+		expect(app?.imports).toEqual(["LegacyModule", "SharedModule"]);
+	});
+
+	it("still records the unresolved entries that set hasUnresolved (AC-4)", () => {
+		const { unresolved } = extractModel(EXT_ROOT);
+		expect(unresolved).toEqual([
+			{
+				filePath: path.join(EXT_ROOT, "app.module.ts"),
+				line: 16,
+				column: 34,
+				reason:
+					"object literal element in providers array without a readable class reference",
+			},
+			{
+				filePath: path.join(EXT_ROOT, "legacy.module.ts"),
+				line: 7,
+				column: 29,
+				reason:
+					"object literal element in providers array without a readable class reference",
+			},
+		]);
+	});
+});
+
 describe("nest model: determinism and empty model (AC-8, AC-10)", () => {
 	it("produces an all-empty model for an empty file set (AC-10)", () => {
 		const adapter = new TsMorphParserAdapter();
@@ -215,7 +365,7 @@ describe("nest model: determinism and empty model (AC-8, AC-10)", () => {
 
 	it("is independent of the input file order and stable across runs (AC-8)", () => {
 		const sorted = extractModel();
-		const reversed = extractModel(true);
+		const reversed = extractModel(APP_ROOT, true);
 		expect(reversed).toEqual(sorted);
 	});
 });
