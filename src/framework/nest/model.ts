@@ -90,6 +90,8 @@ export interface NestDtoPropertyRef {
 	typeText: string | null;
 	/** Decorator names in source order (trailing identifier, `@Ns.Dec` unwrapped). */
 	decoratorNames: string[];
+	/** True when the property declares an initializer. */
+	hasInitializer: boolean;
 	/** 1-based position of the property, adapter-resolved at extraction. */
 	line: number;
 	column: number;

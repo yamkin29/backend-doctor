@@ -483,6 +483,7 @@ function readDtoProperties(
 				.getDecorators()
 				.map((decorator) => decoratorName(decorator))
 				.filter((name): name is string => name !== undefined),
+			hasInitializer: property.getInitializer() !== undefined,
 			line: position.line,
 			column: position.column,
 		});

@@ -14,6 +14,7 @@ import { runRules } from "../../../src/engine/runner.js";
 import { extractNestAppModel } from "../../../src/framework/nest/extract.js";
 import { dtoFieldWithoutValidator } from "../../../src/rules/nest/dto-field-without-validator.js";
 import { missingGlobalValidationPipe } from "../../../src/rules/nest/missing-global-validation-pipe.js";
+import { noAnyInDto } from "../../../src/rules/nest/no-any-in-dto.js";
 import { noBusinessLogicInController } from "../../../src/rules/nest/no-business-logic-in-controller.js";
 import { noGodService } from "../../../src/rules/nest/no-god-service.js";
 import { noRepositoryInController } from "../../../src/rules/nest/no-repository-in-controller.js";
@@ -389,5 +390,58 @@ describe("backend-doctor/dto-field-without-validator (AC-8, AC-14)", () => {
 
 	it("ships valid/invalid fixtures and a rule doc (AC-14)", () => {
 		expectFixturesAndDoc(dtoFieldWithoutValidator, "dto-fields");
+	});
+});
+
+describe("backend-doctor/no-any-in-dto (AC-9, AC-14)", () => {
+	it("flags any, any[], Array<any> and implicit-any DTO properties (AC-9)", () => {
+		expect(
+			summarize(scanNestFixture(noAnyInDto, "any-fields/invalid")),
+		).toEqual([
+			{
+				file: path.join("any-fields", "invalid", "any-fields.dto.ts"),
+				line: 2,
+				column: 2,
+				message:
+					"metadata in CreateItemDto is typed any; the payload shape is unchecked end to end. Give the field a concrete type or a nested DTO class.",
+				severity: "warn",
+				category: "Maintainability",
+			},
+			{
+				file: path.join("any-fields", "invalid", "any-fields.dto.ts"),
+				line: 4,
+				column: 2,
+				message:
+					"tags in CreateItemDto is typed any; the payload shape is unchecked end to end. Give the field a concrete type or a nested DTO class.",
+				severity: "warn",
+				category: "Maintainability",
+			},
+			{
+				file: path.join("any-fields", "invalid", "any-fields.dto.ts"),
+				line: 6,
+				column: 2,
+				message:
+					"payload in CreateItemDto is typed any; the payload shape is unchecked end to end. Give the field a concrete type or a nested DTO class.",
+				severity: "warn",
+				category: "Maintainability",
+			},
+			{
+				file: path.join("any-fields", "invalid", "any-fields.dto.ts"),
+				line: 8,
+				column: 2,
+				message:
+					"note in CreateItemDto has no type annotation and no initializer, so it is implicitly any; the payload shape is unchecked end to end. Give the field a concrete type or a nested DTO class.",
+				severity: "warn",
+				category: "Maintainability",
+			},
+		]);
+	});
+
+	it("stays silent on concrete types and initialized untyped properties (AC-9)", () => {
+		expect(scanNestFixture(noAnyInDto, "any-fields/valid")).toEqual([]);
+	});
+
+	it("ships valid/invalid fixtures and a rule doc (AC-14)", () => {
+		expectFixturesAndDoc(noAnyInDto, "any-fields");
 	});
 });
