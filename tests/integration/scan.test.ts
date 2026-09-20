@@ -1411,3 +1411,58 @@ describe("runScan graph pack (spec 013, AC-6)", () => {
 		}
 	});
 });
+
+describe("runScan on a staged config/env tree (spec 014, AC-6)", () => {
+	function writeConfigProject(): string {
+		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "backend-doctor-intl-"));
+		fs.writeFileSync(
+			path.join(tmp, "package.json"),
+			JSON.stringify({ name: "app" }),
+		);
+		fs.mkdirSync(path.join(tmp, "src"));
+		fs.writeFileSync(
+			path.join(tmp, "src", "main.ts"),
+			[
+				"export function boot(): number {",
+				"\treturn Number(process.env.PORT);",
+				"}",
+			].join("\n"),
+		);
+		fs.writeFileSync(path.join(tmp, ".env"), "PORT=3000\n");
+		return tmp;
+	}
+
+	const PACK_RULES = new Set([
+		"backend-doctor/no-direct-process-env",
+		"backend-doctor/env-without-validation",
+		"backend-doctor/no-committed-env",
+	]);
+
+	it("emits all three config/env rules through runScan, twice identical", async () => {
+		const tmp = writeConfigProject();
+		try {
+			const first = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+			const pack = first.diagnostics
+				.filter((d) => PACK_RULES.has(d.rule))
+				.map((d) => [rel(first, d.filePath), d.line, d.column, d.rule]);
+			expect(pack).toEqual([
+				[".env", 1, 1, "backend-doctor/no-committed-env"],
+				["src/main.ts", 2, 16, "backend-doctor/env-without-validation"],
+				["src/main.ts", 2, 16, "backend-doctor/no-direct-process-env"],
+			]);
+
+			const second = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+			expect(second).toEqual(first);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+});
