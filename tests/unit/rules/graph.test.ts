@@ -11,6 +11,7 @@ import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapte
 import { runProjectRules } from "../../../src/engine/project-rules.js";
 import type { ProjectRuleDefinition } from "../../../src/engine/registry.js";
 import { circularDependency } from "../../../src/rules/graph/circular-dependency.js";
+import { unusedExport } from "../../../src/rules/graph/unused-export.js";
 import { unusedFile } from "../../../src/rules/graph/unused-file.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
@@ -153,6 +154,52 @@ describe("backend-doctor/unused-file (AC-2, AC-9)", () => {
 		expect(
 			fs.existsSync(path.join(REPO_ROOT, unusedFile.docs)),
 			unusedFile.docs,
+		).toBe(true);
+	});
+});
+
+function unusedExportMessage(name: string): string {
+	return `${name} is exported here but no other file imports it; it is public API nobody uses. Remove the export keyword, inline the code, or delete it.`;
+}
+
+describe("backend-doctor/unused-export (AC-3, AC-9)", () => {
+	it("flags exports no other file imports (AC-3)", () => {
+		expect(
+			summarize(scanGraphFixture(unusedExport, "unused-export/invalid")),
+		).toEqual([
+			{
+				file: path.join("unused-export", "invalid", "src", "thing.ts"),
+				line: 5,
+				column: 1,
+				message: unusedExportMessage("abandoned"),
+				severity: "warn",
+				category: "Maintainability",
+			},
+			{
+				file: path.join("unused-export", "invalid", "src", "thing.ts"),
+				line: 9,
+				column: 1,
+				message: unusedExportMessage("Forgotten"),
+				severity: "warn",
+				category: "Maintainability",
+			},
+		]);
+	});
+
+	it("stays silent on named, default, namespace, side-effect and re-export usage, and on entry files (AC-3)", () => {
+		expect(scanGraphFixture(unusedExport, "unused-export/valid")).toEqual([]);
+	});
+
+	it("ships valid/invalid fixture trees and a rule doc (AC-9)", () => {
+		for (const dir of ["valid", "invalid"]) {
+			expect(
+				fs.existsSync(path.join(GRAPH_ROOT, "unused-export", dir)),
+				dir,
+			).toBe(true);
+		}
+		expect(
+			fs.existsSync(path.join(REPO_ROOT, unusedExport.docs)),
+			unusedExport.docs,
 		).toBe(true);
 	});
 });
