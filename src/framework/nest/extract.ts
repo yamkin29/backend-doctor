@@ -15,6 +15,7 @@ import type {
 	NestHandlerEntry,
 	NestHttpVerb,
 	NestModuleEntry,
+	NestProviderEntry,
 } from "./model.js";
 
 const MODULE_LIST_KEYS = [
@@ -49,6 +50,7 @@ export function extractNestAppModel(
 ): NestAppModel {
 	const modules: NestModuleEntry[] = [];
 	const controllers: NestControllerEntry[] = [];
+	const providers: NestProviderEntry[] = [];
 
 	for (const file of files) {
 		if (!referencesNest(file)) continue;
@@ -69,16 +71,20 @@ export function extractNestAppModel(
 					readController(cls, className, controllerDecorator, file, adapter),
 				);
 			}
+			if (findClassDecorator(cls, "Injectable")) {
+				providers.push(nodeEntry(cls, className, file, adapter));
+			}
 			return undefined;
 		});
 	}
 
 	modules.sort(compareEntries);
 	controllers.sort(compareEntries);
+	providers.sort(compareEntries);
 	return {
 		modules,
 		controllers,
-		providers: [],
+		providers,
 		dtos: [],
 		unresolved: [],
 	};
@@ -144,6 +150,22 @@ function readModule(
 
 function isModuleListKey(key: string): key is ModuleListKey {
 	return (MODULE_LIST_KEYS as readonly string[]).includes(key);
+}
+
+/** Position-carrying base fields shared by every class-derived entry. */
+function nodeEntry(
+	cls: ClassDeclaration,
+	className: string,
+	file: SourceFileView,
+	adapter: ParserAdapter,
+): { filePath: string; className: string; line: number; column: number } {
+	const position = adapter.positionOf(file, cls.getStart());
+	return {
+		filePath: file.filePath,
+		className,
+		line: position.line,
+		column: position.column,
+	};
 }
 
 function readController(

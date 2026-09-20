@@ -106,3 +106,17 @@ describe("nest model: controllers (AC-2)", () => {
 		]);
 	});
 });
+
+describe("nest model: providers (AC-3)", () => {
+	it("extracts @Injectable classes as provider entries (AC-3)", () => {
+		const { providers } = extractModel();
+		expect(providers).toEqual([
+			{
+				filePath: path.join(APP_ROOT, "users", "users.service.ts"),
+				className: "UsersService",
+				line: 3,
+				column: 1,
+			},
+		]);
+	});
+});
