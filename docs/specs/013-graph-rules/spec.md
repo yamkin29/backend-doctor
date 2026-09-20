@@ -1,6 +1,6 @@
 # Spec 013 — Graph rules: cycles & unused (F013)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-20)
 - **Phase:** 3 — Project-level (opt-in, full scan)
 - **Depends on:** F003 (engine core: adapter, registry, runner, report) —
   Done; F004 (framework detection, package-root reading precedent) — Done;
@@ -9,6 +9,17 @@
 - **Blocks:** F015 (diff scope must carry graph diagnostics unchanged),
   F017 (rule docs + jsonl consume this pack), F022 (eval corpus gates the
   precision of the unused-* rules)
+
+## Resolution (recorded at approval, 2026-09-20)
+
+The user approved the spec as recommended ("принято"). All open questions
+resolved as recommended: (1) all four rules ship enabled at `warn` — no
+default-off severity; (2) one diagnostic per file participating in a cycle,
+canonical chain in each message; (3) entry heuristic is `package.json`
+`main`/`bin` + `src/main.ts`/`src/index.ts`/`main.ts`/`index.ts`, and the
+reachability rules stay silent when no entry exists; (4) `unused-dependency`
+covers `dependencies` only (minus `@types/*` and non-registry protocols),
+with `scripts` mentions counting as usage; (5) no new dependencies.
 
 ## Problem
 
