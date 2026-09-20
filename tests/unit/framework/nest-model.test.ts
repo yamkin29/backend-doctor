@@ -76,3 +76,33 @@ describe("nest model: modules (AC-1, AC-6)", () => {
 		expect(classNames).not.toContain("PlainModule");
 	});
 });
+
+describe("nest model: controllers (AC-2)", () => {
+	it("extracts the route and verb-decorated handlers (AC-2)", () => {
+		const { controllers } = extractModel();
+		expect(controllers).toEqual([
+			{
+				filePath: path.join(APP_ROOT, "users", "health.controller.ts"),
+				className: "HealthController",
+				line: 3,
+				column: 1,
+				route: null,
+				handlers: [
+					{ name: "ping", verb: "all", path: null, line: 5, column: 2 },
+				],
+			},
+			{
+				filePath: path.join(APP_ROOT, "users", "users.controller.ts"),
+				className: "UsersController",
+				line: 4,
+				column: 1,
+				route: "users",
+				handlers: [
+					{ name: "list", verb: "get", path: null, line: 8, column: 2 },
+					{ name: "one", verb: "get", path: ":id", line: 13, column: 2 },
+					{ name: "create", verb: "post", path: null, line: 18, column: 2 },
+				],
+			},
+		]);
+	});
+});

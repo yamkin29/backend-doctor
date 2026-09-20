@@ -2,13 +2,20 @@ import {
 	type ArrayLiteralExpression,
 	type ClassDeclaration,
 	type Decorator,
+	type MethodDeclaration,
 	Node,
 	type ObjectLiteralExpression,
 	type ParserAdapter,
 	type SourceFileView,
 	SyntaxKind,
 } from "../../engine/parser/types.js";
-import type { NestAppModel, NestModuleEntry } from "./model.js";
+import type {
+	NestAppModel,
+	NestControllerEntry,
+	NestHandlerEntry,
+	NestHttpVerb,
+	NestModuleEntry,
+} from "./model.js";
 
 const MODULE_LIST_KEYS = [
 	"imports",
@@ -17,6 +24,17 @@ const MODULE_LIST_KEYS = [
 	"exports",
 ] as const;
 type ModuleListKey = (typeof MODULE_LIST_KEYS)[number];
+
+const VERB_DECORATORS = new Set([
+	"Get",
+	"Post",
+	"Put",
+	"Patch",
+	"Delete",
+	"Options",
+	"Head",
+	"All",
+]);
 
 /**
  * Extracts the Nest application model (spec 008). Decorator-derived entries
@@ -30,6 +48,7 @@ export function extractNestAppModel(
 	adapter: ParserAdapter,
 ): NestAppModel {
 	const modules: NestModuleEntry[] = [];
+	const controllers: NestControllerEntry[] = [];
 
 	for (const file of files) {
 		if (!referencesNest(file)) continue;
@@ -38,18 +57,27 @@ export function extractNestAppModel(
 			if (!cls) return undefined;
 			const className = cls.getName();
 			if (!className) return undefined; // anonymous classes cannot be referenced by name
-			const decorator = findClassDecorator(cls, "Module");
-			if (decorator) {
-				modules.push(readModule(cls, className, decorator, file, adapter));
+			const moduleDecorator = findClassDecorator(cls, "Module");
+			if (moduleDecorator) {
+				modules.push(
+					readModule(cls, className, moduleDecorator, file, adapter),
+				);
+			}
+			const controllerDecorator = findClassDecorator(cls, "Controller");
+			if (controllerDecorator) {
+				controllers.push(
+					readController(cls, className, controllerDecorator, file, adapter),
+				);
 			}
 			return undefined;
 		});
 	}
 
 	modules.sort(compareEntries);
+	controllers.sort(compareEntries);
 	return {
 		modules,
-		controllers: [],
+		controllers,
 		providers: [],
 		dtos: [],
 		unresolved: [],
@@ -116,6 +144,56 @@ function readModule(
 
 function isModuleListKey(key: string): key is ModuleListKey {
 	return (MODULE_LIST_KEYS as readonly string[]).includes(key);
+}
+
+function readController(
+	cls: ClassDeclaration,
+	className: string,
+	decorator: Decorator,
+	file: SourceFileView,
+	adapter: ParserAdapter,
+): NestControllerEntry {
+	const position = adapter.positionOf(file, cls.getStart());
+	const handlers: NestHandlerEntry[] = [];
+	for (const method of cls.getMethods()) {
+		const verbDecorator = findVerbDecorator(method);
+		if (!verbDecorator) continue;
+		const verbName = decoratorName(verbDecorator);
+		if (!verbName) continue;
+		const methodPosition = adapter.positionOf(file, method.getStart());
+		handlers.push({
+			name: method.getName(),
+			verb: verbName.toLowerCase() as NestHttpVerb,
+			path: decoratorStringArgument(verbDecorator),
+			line: methodPosition.line,
+			column: methodPosition.column,
+		});
+	}
+	return {
+		filePath: file.filePath,
+		className,
+		line: position.line,
+		column: position.column,
+		route: decoratorStringArgument(decorator),
+		handlers,
+	};
+}
+
+/** First recognized verb decorator wins (a multi-verb method is illegal Nest anyway). */
+function findVerbDecorator(method: MethodDeclaration): Decorator | undefined {
+	return method.getDecorators().find((decorator) => {
+		const name = decoratorName(decorator);
+		return name !== undefined && VERB_DECORATORS.has(name);
+	});
+}
+
+/** First string-literal argument of the decorator's call, or null (recall hole). */
+function decoratorStringArgument(decorator: Decorator): string | null {
+	const argument = decorator.getCallExpression()?.getArguments()[0];
+	if (argument && Node.isStringLiteral(argument)) {
+		return argument.getLiteralText();
+	}
+	return null;
 }
 
 /** Identifier elements verbatim; object literals via their readable class reference. */
