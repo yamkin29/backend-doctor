@@ -90,6 +90,25 @@ Under interop, a module **without** a default export exposes a *virtual*
   CallExpressions** (ExpressionStatement wraps VoidExpression /
   AwaitExpression), so a "statement-level call" check suppresses them for
   free — no special cases needed (spec 005 design decision 3).
+- **Template literals come in two kinds** (spec 012): a span-free backtick
+  string (`` `SELECT 1` ``) is a `NoSubstitutionTemplateLiteral`, NOT a
+  `TemplateExpression` — only templates with at least one `${…}` parse as
+  `TemplateExpression`. A "has interpolation" check must treat the two
+  kinds separately or static templates fall through to the dynamic case.
+- **Tagged templates are not CallExpressions** (spec 012):
+  `` prisma.$queryRaw`…` `` is a `TaggedTemplateExpression`, so
+  callee-matching call collectors never see it — the parameterized safe
+  form is invisible to a raw-query rule by construction. Conversely, a
+  tagged template *argument* (`$queryRawUnsafe(Prisma.sql`…`)`) is reached
+  via the tag (`getTag()`), which needs `TaggedTemplateExpression` named in
+  a signature — the parser boundary grew a type-only re-export for it.
+- **`CallExpression.getArguments()[0]` is `Node`-typed** (spec 012): after
+  excluding `Node.isSpreadElement` the element is still not an `Expression`
+  to the type system; the established `argument as Expression` cast
+  applies (`no-ssrf.ts`, `no-unsafe-merge.ts`, prisma pack). Object-literal
+  arguments additionally distinguish `PropertyAssignment` from
+  `ShorthandPropertyAssignment` — `{ take }` is the shorthand kind, so a
+  name census that checks only `PropertyAssignment` misses it.
 - **`while`/`do…while` conditions come from `getExpression()`, not
   `getCondition()`** (ts-morph v28): `WhileStatement`/`DoStatement` are
   built on an `ExpressionedNode` base and their runtime prototypes carry

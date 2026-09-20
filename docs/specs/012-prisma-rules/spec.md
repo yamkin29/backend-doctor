@@ -1,6 +1,6 @@
 # Spec 012 — Rules: Prisma (F012)
 
-- **Status:** Approved (2026-09-20)
+- **Status:** Implemented (2026-09-20)
 - **Phase:** 2 — Nest specifics & Prisma
 - **Depends on:** F004 (framework detection — the `prisma` markers already
   ship) — Done; F003 (engine core, pack gate) — Done; F005/F006/F007 (shared
