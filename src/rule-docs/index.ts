@@ -132,3 +132,79 @@ export function checkRuleDocs(
 
 	return violations;
 }
+
+/**
+ * Spec 017 AC-9: the skeleton for a new rule doc, derived from registry
+ * metadata. Registry-derived lines (heading, Category, Default severity) are
+ * final; the prose sections carry loud TODO markers so an unfinished doc is
+ * visible at a glance while already satisfying the drift check's metadata
+ * contract.
+ */
+export function scaffoldRuleDocContent(rule: RuleDocsMeta): string {
+	return `# ${rule.id}
+
+TODO: one-sentence summary of what this rule flags.
+
+- **Category:** ${rule.category}
+- **Default severity:** \`${rule.severity}\`
+
+## Problem
+
+TODO: why this matters in backend services. Precision over recall
+(constitution §2): also state what is deliberately NOT flagged.
+
+## Bad
+
+\`\`\`ts
+// ❌ TODO: offending example
+\`\`\`
+
+## Good
+
+\`\`\`ts
+// ✅ TODO: corrected example
+\`\`\`
+
+## Configuration
+
+\`\`\`ts
+import { defineConfig } from "backend-doctor";
+
+export default defineConfig({
+	rules: {
+		// Escalate to a blocking error in CI:
+		"${rule.id}": "error",
+		// or silence it deliberately:
+		// "${rule.id}": "off",
+	},
+});
+\`\`\`
+`;
+}
+
+export type ScaffoldResult =
+	| { readonly ok: true; readonly path: string }
+	| { readonly ok: false; readonly reason: "exists"; readonly path: string };
+
+/**
+ * Writes the skeleton at the rule's resolved doc path, creating parent
+ * directories. An existing doc is never touched (atomic create-or-fail via
+ * the `wx` flag); unexpected write errors propagate — no silent fallbacks
+ * (constitution §8).
+ */
+export function scaffoldRuleDoc(
+	rule: RuleDocsMeta,
+	docsDir: string,
+): ScaffoldResult {
+	const docPath = resolveDocPath(rule, docsDir);
+	fs.mkdirSync(path.dirname(docPath), { recursive: true });
+	try {
+		fs.writeFileSync(docPath, scaffoldRuleDocContent(rule), { flag: "wx" });
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+			throw error;
+		}
+		return { ok: false, reason: "exists", path: docPath };
+	}
+	return { ok: true, path: docPath };
+}

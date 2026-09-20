@@ -9,6 +9,8 @@ import {
 	checkRuleDocs,
 	type RuleDocsMeta,
 	resolveDocPath,
+	scaffoldRuleDoc,
+	scaffoldRuleDocContent,
 } from "../../src/rule-docs/index.js";
 
 /**
@@ -148,5 +150,61 @@ describe("checkRuleDocs violations in a temp tree (spec 017 AC-8 red paths)", ()
 		const meta = makeMeta();
 		writeDoc(docsDir, meta, validDoc(meta));
 		expect(checkRuleDocs([meta], docsDir)).toEqual([]);
+	});
+});
+
+describe("scaffoldRuleDocContent (spec 017 AC-9)", () => {
+	it("derives heading, category and severity from the registry metadata", () => {
+		const meta = makeMeta();
+		const content = scaffoldRuleDocContent(meta);
+		expect(content).toContain(`# ${meta.id}`);
+		expect(content).toContain(`- **Category:** ${meta.category}`);
+		expect(content).toContain(`- **Default severity:** \`${meta.severity}\``);
+	});
+
+	it("marks the prose sections as explicit TODOs", () => {
+		const content = scaffoldRuleDocContent(makeMeta());
+		expect(content).toContain("TODO");
+		expect(content).toContain("## Problem");
+		expect(content).toContain("## Bad");
+		expect(content).toContain("## Good");
+		expect(content).toContain("## Configuration");
+	});
+
+	it("produces a doc that passes the drift check as written", () => {
+		const meta = makeMeta();
+		const docsDir = makeDocsDir();
+		writeDoc(docsDir, meta, scaffoldRuleDocContent(meta));
+		expect(checkRuleDocs([meta], docsDir)).toEqual([]);
+	});
+});
+
+describe("scaffoldRuleDoc (spec 017 AC-9)", () => {
+	it("creates the doc at the resolved path and reports created", () => {
+		const docsDir = makeDocsDir();
+		const meta = makeMeta({
+			id: "backend-doctor/no-demo",
+			docs: "docs/rules/backend-doctor/no-demo.md",
+		});
+		const result = scaffoldRuleDoc(meta, docsDir);
+		expect(result.ok).toBe(true);
+		const filePath = resolveDocPath(meta, docsDir);
+		const content = fs.readFileSync(filePath, "utf8");
+		expect(content).toContain("# backend-doctor/no-demo");
+		expect(content).toContain("- **Category:** Security");
+	});
+
+	it("refuses to overwrite an existing doc and leaves it byte-identical", () => {
+		const docsDir = makeDocsDir();
+		const meta = makeMeta();
+		const original = "hand written prose — do not touch\n";
+		const filePath = writeDoc(docsDir, meta, original);
+		const result = scaffoldRuleDoc(meta, docsDir);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.reason).toBe("exists");
+			expect(result.path).toBe(filePath);
+		}
+		expect(fs.readFileSync(filePath, "utf8")).toBe(original);
 	});
 });
