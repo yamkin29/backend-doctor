@@ -131,6 +131,7 @@ describe("e2e: nest app model through the bin (spec 008)", () => {
 				line: 1,
 				column: 1,
 				via: "suffix",
+				properties: [],
 			},
 		]);
 		expect(nest?.unresolved).toEqual([]);

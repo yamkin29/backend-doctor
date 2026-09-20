@@ -31,11 +31,12 @@ function provider(
 		column: 1,
 		scope: opts?.scope ?? null,
 		injections: opts?.injections ?? [],
+		publicMethods: [],
 	};
 }
 
 function injection(name: string, forwardRef = false): NestInjectionRef {
-	return { name, forwardRef, line: 5, column: 3 };
+	return { name, forwardRef, decoratorNames: [], line: 5, column: 3 };
 }
 
 function module(

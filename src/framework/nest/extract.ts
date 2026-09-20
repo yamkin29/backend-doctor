@@ -15,6 +15,7 @@ import type {
 	NestAppModel,
 	NestControllerEntry,
 	NestDtoEntry,
+	NestDtoPropertyRef,
 	NestHandlerEntry,
 	NestHttpVerb,
 	NestInjectionRef,
@@ -69,6 +70,15 @@ const SCOPE_LITERALS = {
 /** A bare identifier: the only parameter type shape that reads as a class. */
 const IDENTIFIER_TYPE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
+/** Nest lifecycle hooks never count as a provider's public API (spec 010). */
+const LIFECYCLE_HOOKS = new Set([
+	"onModuleInit",
+	"onModuleDestroy",
+	"onApplicationBootstrap",
+	"beforeApplicationShutdown",
+	"onApplicationShutdown",
+]);
+
 /**
  * Extracts the Nest application model (spec 008). Decorator-derived entries
  * come only from files referencing a `@nestjs/` specifier (same prefix style
@@ -121,11 +131,18 @@ export function extractNestAppModel(
 						...nodeEntry(cls, className, file, adapter),
 						scope: readScope(injectableDecorator),
 						injections: readInjections(cls, file, adapter),
+						publicMethods: readPublicMethods(cls),
 					});
 				}
 			}
 			const via = recognizeDto(cls, className);
-			if (via) dtos.push({ ...nodeEntry(cls, className, file, adapter), via });
+			if (via) {
+				dtos.push({
+					...nodeEntry(cls, className, file, adapter),
+					via,
+					properties: readDtoProperties(cls, file, adapter),
+				});
+			}
 			return undefined;
 		});
 	}
@@ -421,11 +438,56 @@ function readInjections(
 		injections.push({
 			name,
 			forwardRef: isForwardRefInjection(parameter),
+			decoratorNames: parameterDecorators(parameter),
 			line: position.line,
 			column: position.column,
 		});
 	}
 	return injections;
+}
+
+function parameterDecorators(parameter: ParameterDeclaration): string[] {
+	return parameter
+		.getDecorators()
+		.map((decorator) => decoratorName(decorator))
+		.filter((name): name is string => name !== undefined);
+}
+
+/** Public instance method names: not static, not lifecycle, not scoped away. */
+function readPublicMethods(cls: ClassDeclaration): string[] {
+	const names: string[] = [];
+	for (const method of cls.getMethods()) {
+		if (method.isStatic()) continue;
+		if (method.getScope() !== "public") continue;
+		if (LIFECYCLE_HOOKS.has(method.getName())) continue;
+		names.push(method.getName());
+	}
+	return names;
+}
+
+/** Instance `PropertyDeclaration`s: name, collapsed type text, decorators, position. */
+function readDtoProperties(
+	cls: ClassDeclaration,
+	file: SourceFileView,
+	adapter: ParserAdapter,
+): NestDtoPropertyRef[] {
+	const properties: NestDtoPropertyRef[] = [];
+	for (const property of cls.getProperties()) {
+		if (property.isStatic()) continue;
+		const typeNode = property.getTypeNode();
+		const position = adapter.positionOf(file, property.getStart());
+		properties.push({
+			name: property.getName(),
+			typeText: typeNode ? typeNode.getText().replace(/\s+/g, "") : null,
+			decoratorNames: property
+				.getDecorators()
+				.map((decorator) => decoratorName(decorator))
+				.filter((name): name is string => name !== undefined),
+			line: position.line,
+			column: position.column,
+		});
+	}
+	return properties;
 }
 
 function hasParameterDecorator(

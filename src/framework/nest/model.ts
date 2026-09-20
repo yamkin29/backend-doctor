@@ -60,6 +60,8 @@ export interface NestInjectionRef {
 	name: string;
 	/** True when the parameter carries @Inject(forwardRef(() => X)). */
 	forwardRef: boolean;
+	/** Parameter decorator names in source order, e.g. ["InjectRepository"]. */
+	decoratorNames: string[];
 	/** 1-based position of the parameter, adapter-resolved at extraction. */
 	line: number;
 	column: number;
@@ -74,11 +76,30 @@ export interface NestProviderEntry extends NestModelNode {
 	scope: "request" | "transient" | "singleton" | null;
 	/** Constructor DI edges in source order (@Optional params excluded). */
 	injections: NestInjectionRef[];
+	/**
+	 * Public instance method names in source order. The constructor, static
+	 * methods and the Nest lifecycle hooks are excluded (spec 010).
+	 */
+	publicMethods: string[];
+}
+
+/** One instance property of a recognized DTO class (spec 010). */
+export interface NestDtoPropertyRef {
+	name: string;
+	/** Type annotation as written, whitespace-collapsed; null when absent. */
+	typeText: string | null;
+	/** Decorator names in source order (trailing identifier, `@Ns.Dec` unwrapped). */
+	decoratorNames: string[];
+	/** 1-based position of the property, adapter-resolved at extraction. */
+	line: number;
+	column: number;
 }
 
 export interface NestDtoEntry extends NestModelNode {
 	/** How the class was recognized: name suffix or pinned decorator. */
 	via: "suffix" | "decorator";
+	/** Instance properties in source order; statics, methods, accessors excluded. */
+	properties: NestDtoPropertyRef[];
 }
 
 export interface NestUnresolvedRef {

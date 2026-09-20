@@ -126,6 +126,7 @@ describe("nest model: controllers (AC-2)", () => {
 					{
 						name: "UsersService",
 						forwardRef: false,
+						decoratorNames: [],
 						line: 6,
 						column: 14,
 					},
@@ -146,6 +147,7 @@ describe("nest model: providers (AC-3)", () => {
 				column: 1,
 				scope: null,
 				injections: [],
+				publicMethods: ["count"],
 			},
 		]);
 	});
@@ -161,6 +163,22 @@ describe("nest model: dtos (AC-4)", () => {
 				line: 1,
 				column: 1,
 				via: "suffix",
+				properties: [
+					{
+						name: "name",
+						typeText: null,
+						decoratorNames: [],
+						line: 2,
+						column: 2,
+					},
+					{
+						name: "email",
+						typeText: null,
+						decoratorNames: [],
+						line: 3,
+						column: 2,
+					},
+				],
 			},
 			{
 				filePath: path.join(APP_ROOT, "users", "user.dto.ts"),
@@ -168,6 +186,15 @@ describe("nest model: dtos (AC-4)", () => {
 				line: 3,
 				column: 1,
 				via: "decorator",
+				properties: [
+					{
+						name: "term",
+						typeText: null,
+						decoratorNames: [],
+						line: 5,
+						column: 2,
+					},
+				],
 			},
 		]);
 	});
@@ -274,10 +301,12 @@ describe("nest model: DI extensions (spec 009 AC-1..5)", () => {
 					{
 						name: "ArchiveService",
 						forwardRef: true,
+						decoratorNames: ["Inject"],
 						line: 6,
 						column: 3,
 					},
 				],
+				publicMethods: [],
 			},
 			{
 				filePath: path.join(EXT_ROOT, "current-user.service.ts"),
@@ -289,10 +318,12 @@ describe("nest model: DI extensions (spec 009 AC-1..5)", () => {
 					{
 						name: "LegacyService",
 						forwardRef: false,
+						decoratorNames: [],
 						line: 6,
 						column: 14,
 					},
 				],
+				publicMethods: [],
 			},
 			{
 				filePath: path.join(EXT_ROOT, "legacy.service.ts"),
@@ -301,6 +332,7 @@ describe("nest model: DI extensions (spec 009 AC-1..5)", () => {
 				column: 1,
 				scope: null,
 				injections: [],
+				publicMethods: ["find"],
 			},
 			{
 				filePath: path.join(EXT_ROOT, "shared.module.ts"),
@@ -309,6 +341,7 @@ describe("nest model: DI extensions (spec 009 AC-1..5)", () => {
 				column: 1,
 				scope: null,
 				injections: [],
+				publicMethods: [],
 			},
 		]);
 	});
@@ -346,6 +379,100 @@ describe("nest model: DI extensions (spec 009 AC-1..5)", () => {
 				column: 29,
 				reason:
 					"object literal element in providers array without a readable class reference",
+			},
+		]);
+	});
+});
+
+describe("nest model: layering extensions (spec 010 AC-1..3)", () => {
+	const LAYERING_ROOT = path.join(
+		FIXTURE_ROOT,
+		"layers-dto",
+		"model-extensions",
+	);
+
+	it("records parameter decorator names on injection edges (AC-1)", () => {
+		const { providers } = extractModel(LAYERING_ROOT);
+		expect(providers).toEqual([
+			{
+				filePath: path.join(LAYERING_ROOT, "users.service.ts"),
+				className: "UsersService",
+				line: 3,
+				column: 1,
+				scope: null,
+				injections: [
+					{
+						name: "DbService",
+						forwardRef: false,
+						decoratorNames: [],
+						line: 6,
+						column: 3,
+					},
+					{
+						name: "UsersRepository",
+						forwardRef: false,
+						decoratorNames: ["Inject"],
+						line: 7,
+						column: 3,
+					},
+				],
+				publicMethods: ["findAll", "findOne"],
+			},
+		]);
+	});
+
+	it("excludes lifecycle hooks, static, private and protected methods (AC-2)", () => {
+		const { providers } = extractModel(LAYERING_ROOT);
+		const service = providers.find((p) => p.className === "UsersService");
+		expect(service?.publicMethods).toEqual(["findAll", "findOne"]);
+	});
+
+	it("records DTO properties with types and decorators, excluding statics (AC-3)", () => {
+		const { dtos } = extractModel(LAYERING_ROOT);
+		expect(dtos).toEqual([
+			{
+				filePath: path.join(LAYERING_ROOT, "create-user.dto.ts"),
+				className: "CreateUserDto",
+				line: 3,
+				column: 1,
+				via: "suffix",
+				properties: [
+					{
+						name: "email",
+						typeText: "string",
+						decoratorNames: ["ApiProperty", "IsString"],
+						line: 4,
+						column: 2,
+					},
+					{
+						name: "tags",
+						typeText: "any[]",
+						decoratorNames: [],
+						line: 8,
+						column: 2,
+					},
+					{
+						name: "backup",
+						typeText: "Array<any>",
+						decoratorNames: [],
+						line: 10,
+						column: 2,
+					},
+					{
+						name: "bare",
+						typeText: null,
+						decoratorNames: [],
+						line: 12,
+						column: 2,
+					},
+					{
+						name: "count",
+						typeText: null,
+						decoratorNames: [],
+						line: 14,
+						column: 2,
+					},
+				],
 			},
 		]);
 	});
