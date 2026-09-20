@@ -12,6 +12,7 @@ import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { extractNestAppModel } from "../../../src/framework/nest/extract.js";
 import { noBusinessLogicInController } from "../../../src/rules/nest/no-business-logic-in-controller.js";
+import { noRepositoryInController } from "../../../src/rules/nest/no-repository-in-controller.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const FIXTURE_ROOT = path.resolve(
@@ -111,5 +112,68 @@ describe("backend-doctor/no-business-logic-in-controller (AC-4, AC-14)", () => {
 
 	it("ships valid/invalid fixtures and a rule doc (AC-14)", () => {
 		expectFixturesAndDoc(noBusinessLogicInController, "controller-logic");
+	});
+});
+
+describe("backend-doctor/no-repository-in-controller (AC-5, AC-14)", () => {
+	it("flags decorator, suffix and Prisma-client repository injections (AC-5)", () => {
+		expect(
+			summarize(
+				scanNestFixture(
+					noRepositoryInController,
+					"controller-repository/invalid",
+				),
+			),
+		).toEqual([
+			{
+				file: path.join(
+					"controller-repository",
+					"invalid",
+					"tasks.controller.ts",
+				),
+				line: 7,
+				column: 3,
+				message:
+					"UsersRepository is injected directly into the controller TasksController; bypassing the service layer couples HTTP handling to storage. Inject a service that owns the repository instead.",
+				severity: "warn",
+				category: "Architecture",
+			},
+			{
+				file: path.join(
+					"controller-repository",
+					"invalid",
+					"tasks.controller.ts",
+				),
+				line: 8,
+				column: 3,
+				message:
+					"PrismaService is injected directly into the controller TasksController; bypassing the service layer couples HTTP handling to storage. Inject a service that owns the repository instead.",
+				severity: "warn",
+				category: "Architecture",
+			},
+			{
+				file: path.join(
+					"controller-repository",
+					"invalid",
+					"tasks.controller.ts",
+				),
+				line: 9,
+				column: 3,
+				message:
+					"AuditRepository is injected directly into the controller TasksController; bypassing the service layer couples HTTP handling to storage. Inject a service that owns the repository instead.",
+				severity: "warn",
+				category: "Architecture",
+			},
+		]);
+	});
+
+	it("stays silent when repositories are injected into services (AC-5)", () => {
+		expect(
+			scanNestFixture(noRepositoryInController, "controller-repository/valid"),
+		).toEqual([]);
+	});
+
+	it("ships valid/invalid fixtures and a rule doc (AC-14)", () => {
+		expectFixturesAndDoc(noRepositoryInController, "controller-repository");
 	});
 });
