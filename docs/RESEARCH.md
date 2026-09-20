@@ -93,6 +93,10 @@ Under interop, a module **without** a default export exposes a *virtual*
   class positions at the leading `@` of its first decorator; an undecorated
   `export class` positions at the `export` keyword. Model entries in
   `src/framework/nest/` pin fixture coordinates on this basis.
+- **Decorated *parameters* position at the leading `@` too** (spec 009): a
+  `@Inject(…)`-decorated constructor parameter starts at the `@`, an
+  undecorated one at its first modifier (`private`). Pin DI-edge coordinates
+  from real runs, not by counting characters.
 - **Read decorator arguments through `Decorator.getCallExpression()`**, then
   `getArguments()[0]`; a bare `@Decorator` (no call) has no arguments.
   `StringLiteral.getLiteralText()` returns the unquoted value (`getText()`
@@ -109,6 +113,22 @@ Under interop, a module **without** a default export exposes a *virtual*
   `ObjectLiteralExpression.getProperties()`** are the safe way to read
   decorator metadata; `getProperty(name)` is fine too but iteration lets you
   report spreads/computed keys instead of silently skipping them.
+
+### Constructor injections (spec 009)
+
+- **Skip the type-checker entirely for DI edges.** A constructor parameter is
+  a class edge when `getTypeNode().getText()` matches
+  `/^[A-Za-z_$][A-Za-z0-9_$]*$/` — bare identifiers only, so primitives,
+  generics (`Foo<Bar>`) and qualified names (`ns.Foo`) fall out for free.
+  This avoids probing `TypeReferenceNode`-family guards (the prototype-chain
+  trap above) entirely.
+- **`cls.getConstructors()[0]`** is enough — TS classes have at most one
+  constructor and the array is empty when there is none. No
+  `ConstructorDeclaration` re-export is needed; inference carries the types.
+- **Parameter decorators read like class decorators:**
+  `parameter.getDecorators()` + the same trailing-identifier unwrap detects
+  `@Optional` (skip the edge) and `@Inject(forwardRef(() => X))` (the
+  forwardRef flag).
 
 ### pnpm 12
 

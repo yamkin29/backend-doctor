@@ -1,6 +1,6 @@
 # Spec 009 — Nest DI rules (F009)
 
-- **Status:** Approved (2026-09-20)
+- **Status:** Implemented (2026-09-20)
 - **Phase:** 2 — Nest specifics & Prisma
 - **Depends on:** F008 (Nest app model) — Done (model, `RuleContext.nest`, pack
   gate, `nest-app-model` skippedCheck); F003 (engine core) — Done; F004
