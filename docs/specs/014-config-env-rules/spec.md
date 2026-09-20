@@ -1,6 +1,6 @@
 # Spec 014 — Config & env rules (F014)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-20)
 - **Phase:** 3 — Project-level (opt-in, full scan)
 - **Depends on:** F003 (engine core: adapter, registry, runner, report) —
   Done; F013 (project rule kind, package-surface reading precedent) — Done;
@@ -8,6 +8,20 @@
   helper patterns, `isInsideFunctionLike`, fixture conventions) — Done
 - **Blocks:** F017 (rule docs + jsonl consume this pack), F022 (eval corpus
   gates the precision of the pack)
+
+## Resolution (recorded at approval, 2026-09-20)
+
+The user approved the spec as recommended ("принято"). All open questions
+resolved as recommended: (1) all three rules ship enabled at `warn` — no
+default-off severity; (2) `no-direct-process-env` exempts test-shaped
+paths (`*.test.ts`/`*.spec.ts` basenames, segments `test`, `tests`,
+`__tests__`, `e2e`) on top of the config-shaped exemption; (3)
+`env-without-validation` runs project-scope — any pinned validation-lib
+import anywhere silences, hand-rolled validation stays flagged as a
+documented FP risk for F022 to gate; (4) `no-committed-env` covers the
+8-name dotenv candidate set at the package root with the approximate
+picomatch-based gitignore matcher; (5) no new dependencies; (6) categories
+Configuration / Configuration / Security.
 
 ## Problem
 
