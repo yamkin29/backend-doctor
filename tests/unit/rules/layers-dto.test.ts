@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { defaultConfig } from "../../../src/config/types.js";
@@ -12,6 +13,7 @@ import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { extractNestAppModel } from "../../../src/framework/nest/extract.js";
 import { noBusinessLogicInController } from "../../../src/rules/nest/no-business-logic-in-controller.js";
+import { noGodService } from "../../../src/rules/nest/no-god-service.js";
 import { noRepositoryInController } from "../../../src/rules/nest/no-repository-in-controller.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
@@ -175,5 +177,119 @@ describe("backend-doctor/no-repository-in-controller (AC-5, AC-14)", () => {
 
 	it("ships valid/invalid fixtures and a rule doc (AC-14)", () => {
 		expectFixturesAndDoc(noRepositoryInController, "controller-repository");
+	});
+});
+
+/** Runs one rule over a temp tree with the given source file. */
+function scanTempSource(
+	rule: RuleDefinition,
+	fileName: string,
+	source: string,
+): Diagnostic[] {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "backend-doctor-layers-"));
+	fs.writeFileSync(path.join(dir, fileName), source);
+	try {
+		const paths = collectFiles({
+			target: dir,
+			extensions: SUPPORTED_EXTENSIONS,
+			excludes: [],
+			ignoreGlobs: [],
+		});
+		const adapter = new TsMorphParserAdapter();
+		const { files: views } = adapter.createProject(paths);
+		const nestModel = extractNestAppModel(views, adapter);
+		const diagnostics: Diagnostic[] = [];
+		for (const view of views) {
+			diagnostics.push(
+				...runRules({
+					file: view,
+					rules: [rule],
+					config: defaultConfig(),
+					adapter,
+					scanRoot: dir,
+					detectedFrameworks: ["nest"],
+					nestModel,
+				}).diagnostics,
+			);
+		}
+		return diagnostics;
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+}
+
+function serviceWithManyMethods(methodCount: number): string {
+	const methods = Array.from(
+		{ length: methodCount },
+		(_, i) => `\tmethod${i + 1}(): number {\n\t\treturn ${i + 1};\n\t}\n`,
+	).join("\n");
+	return (
+		'import { Injectable } from "@nestjs/common";\n\n' +
+		"@Injectable()\nexport class BigService {\n" +
+		"\tonModuleInit(): void {}\n\n" +
+		methods +
+		"}\n"
+	);
+}
+
+describe("backend-doctor/no-god-service (AC-6, AC-14)", () => {
+	it("flags a provider with six constructor dependencies (AC-6)", () => {
+		expect(
+			summarize(scanNestFixture(noGodService, "god-service/invalid")),
+		).toEqual([
+			{
+				file: path.join("god-service", "invalid", "dashboard.service.ts"),
+				line: 3,
+				column: 1,
+				message:
+					"DashboardService carries 6 constructor dependencies and 0 public methods; that breadth is a god-service smell. Split it along domain responsibilities into smaller providers.",
+				severity: "warn",
+				category: "Maintainability",
+			},
+		]);
+	});
+
+	it("stays silent at five constructor dependencies (AC-6)", () => {
+		expect(scanNestFixture(noGodService, "god-service/valid")).toEqual([]);
+	});
+
+	it("flags twelve public methods, not eleven; lifecycle hooks excluded (AC-6)", () => {
+		const diagnostics = scanTempSource(
+			noGodService,
+			"big.service.ts",
+			serviceWithManyMethods(12),
+		);
+		expect(diagnostics.map((d) => path.basename(d.filePath))).toEqual([
+			"big.service.ts",
+		]);
+		expect(
+			diagnostics.map(({ line, column, message, severity, category }) => ({
+				line,
+				column,
+				message,
+				severity,
+				category,
+			})),
+		).toEqual([
+			{
+				line: 3,
+				column: 1,
+				message:
+					"BigService carries 0 constructor dependencies and 12 public methods; that breadth is a god-service smell. Split it along domain responsibilities into smaller providers.",
+				severity: "warn",
+				category: "Maintainability",
+			},
+		]);
+		expect(
+			scanTempSource(
+				noGodService,
+				"big.service.ts",
+				serviceWithManyMethods(11),
+			),
+		).toEqual([]);
+	});
+
+	it("ships valid/invalid fixtures and a rule doc (AC-14)", () => {
+		expectFixturesAndDoc(noGodService, "god-service");
 	});
 });
