@@ -14,6 +14,7 @@ import { extractNestAppModel } from "../../../src/framework/nest/extract.js";
 import { noEmptyCatch } from "../../../src/rules/errors/no-empty-catch.js";
 import { noErrorDetailsLeak } from "../../../src/rules/errors/no-error-details-leak.js";
 import { missingOnModuleDestroy } from "../../../src/rules/nest/missing-on-module-destroy.js";
+import { noHeavyConstructorWork } from "../../../src/rules/nest/no-heavy-constructor-work.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const FLAT_ROOT = path.resolve(
@@ -264,6 +265,68 @@ describe("backend-doctor/missing-on-module-destroy (AC-3, AC-5, AC-9)", () => {
 		expect(
 			fs.existsSync(path.join(REPO_ROOT, missingOnModuleDestroy.docs)),
 			missingOnModuleDestroy.docs,
+		).toBe(true);
+	});
+});
+
+function heavyConstructorMessage(name: string, className: string): string {
+	return `${name} runs in the constructor of ${className}; heavy initialization runs before DI completes and hides failures from the lifecycle. Move it into onModuleInit so it starts after dependencies are resolved and can be awaited.`;
+}
+
+describe("backend-doctor/no-heavy-constructor-work (AC-4, AC-5, AC-9)", () => {
+	it("flags process and connection calls in provider constructors (AC-4)", () => {
+		expect(
+			summarizeNest(
+				scanNestFixture(noHeavyConstructorWork, "heavy-constructor/invalid"),
+			),
+		).toEqual([
+			{
+				file: path.join("heavy-constructor", "invalid", "dial.service.ts"),
+				line: 8,
+				column: 8,
+				message: heavyConstructorMessage("connect", "DialService"),
+				severity: "warn",
+				category: "Correctness",
+			},
+			{
+				file: path.join("heavy-constructor", "invalid", "redis.service.ts"),
+				line: 12,
+				column: 8,
+				message: heavyConstructorMessage("$connect", "RedisService"),
+				severity: "warn",
+				category: "Correctness",
+			},
+			{
+				file: path.join(
+					"heavy-constructor",
+					"invalid",
+					"spawn-sync.service.ts",
+				),
+				line: 7,
+				column: 3,
+				message: heavyConstructorMessage("execSync", "SpawnSyncService"),
+				severity: "warn",
+				category: "Correctness",
+			},
+		]);
+	});
+
+	it("stays silent on init-hook work, own members, methods and controllers (AC-4, AC-5)", () => {
+		expect(
+			scanNestFixture(noHeavyConstructorWork, "heavy-constructor/valid"),
+		).toEqual([]);
+	});
+
+	it("ships valid/invalid fixtures and a rule doc (AC-9)", () => {
+		for (const dir of ["valid", "invalid"]) {
+			expect(
+				fs.existsSync(path.join(NEST_ROOT, "heavy-constructor", dir)),
+				dir,
+			).toBe(true);
+		}
+		expect(
+			fs.existsSync(path.join(REPO_ROOT, noHeavyConstructorWork.docs)),
+			noHeavyConstructorWork.docs,
 		).toBe(true);
 	});
 });

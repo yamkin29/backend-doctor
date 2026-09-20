@@ -17,6 +17,7 @@ import { missingOnModuleDestroy } from "./nest/missing-on-module-destroy.js";
 import { noAnyInDto } from "./nest/no-any-in-dto.js";
 import { noBusinessLogicInController } from "./nest/no-business-logic-in-controller.js";
 import { noGodService } from "./nest/no-god-service.js";
+import { noHeavyConstructorWork } from "./nest/no-heavy-constructor-work.js";
 import { noRepositoryInController } from "./nest/no-repository-in-controller.js";
 import { providerNotRegistered } from "./nest/provider-not-registered.js";
 import { requestScopedInSingleton } from "./nest/request-scoped-in-singleton.js";
@@ -64,6 +65,7 @@ const productRules = [
 	missingGlobalValidationPipe,
 	dtoFieldWithoutValidator,
 	noAnyInDto,
+	noHeavyConstructorWork,
 ];
 
 for (const rule of productRules) {

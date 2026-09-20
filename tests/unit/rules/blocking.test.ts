@@ -240,7 +240,7 @@ describe("product registry (AC-13, spec 007)", () => {
 		]) {
 			expect(ids, id).toContain(id);
 		}
-		expect(ids).toHaveLength(29);
+		expect(ids).toHaveLength(30);
 		expect(new Set(ids).size).toBe(ids.length);
 	});
 });
