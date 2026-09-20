@@ -15,6 +15,7 @@ import { noHardcodedSecrets } from "../../../src/rules/security/no-hardcoded-sec
 import { noNewFunc } from "../../../src/rules/security/no-new-func.js";
 import { noPathTraversal } from "../../../src/rules/security/no-path-traversal.js";
 import { noSsrf } from "../../../src/rules/security/no-ssrf.js";
+import { noUnsafeMerge } from "../../../src/rules/security/no-unsafe-merge.js";
 import { noWeakCrypto } from "../../../src/rules/security/no-weak-crypto.js";
 
 const FIXTURE_ROOT = path.resolve(
@@ -31,6 +32,7 @@ const rules: Record<string, RuleDefinition> = {
 	"no-hardcoded-secrets": noHardcodedSecrets,
 	"no-weak-crypto": noWeakCrypto,
 	"no-ssrf": noSsrf,
+	"no-unsafe-merge": noUnsafeMerge,
 };
 
 /** Runs one rule over a fixture directory using the real parser adapter. */
@@ -351,5 +353,45 @@ describe("backend-doctor/no-ssrf (AC-9..10)", () => {
 
 	it("stays silent on literal URLs, shadowed fetch and non-axios files (AC-10)", () => {
 		expect(scanFixture("no-ssrf", "no-ssrf/valid")).toEqual([]);
+	});
+});
+
+describe("backend-doctor/no-unsafe-merge (AC-11..12)", () => {
+	const message =
+		'Merging request data into an object lets "__proto__" and "constructor" keys reach the prototype (prototype pollution). Use a prototype-safe merge or strip those keys first.';
+
+	it("flags lodash merges, Object.assign and bare deepmerge with request input (AC-11)", () => {
+		expect(
+			summarize(scanFixture("no-unsafe-merge", "no-unsafe-merge/invalid")),
+		).toEqual([
+			{
+				file: path.join("no-unsafe-merge", "invalid", "bare-deepmerge.ts"),
+				line: 4,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-unsafe-merge", "invalid", "lodash-merge.ts"),
+				line: 4,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+			{
+				file: path.join("no-unsafe-merge", "invalid", "object-assign.ts"),
+				line: 2,
+				column: 9,
+				message,
+				severity: "warn",
+				category: "Security",
+			},
+		]);
+	});
+
+	it("stays silent on trusted args, shadowed helpers and spreads (AC-12)", () => {
+		expect(scanFixture("no-unsafe-merge", "no-unsafe-merge/valid")).toEqual([]);
 	});
 });
