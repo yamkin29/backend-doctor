@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { expectSuccess, makeTmpDir, runCli } from "./helpers.js";
@@ -42,6 +41,7 @@ function writeSecurityApp(dir: string): void {
 			"\tquery: { url: string };",
 			"}): Promise<unknown> {",
 			'\tconst file = path.join("/uploads", req.params.file);',
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: the placeholder is the staged input
 			"\tconst listing = exec(`ls ${file}`);",
 			'\tconst digest = createHash("md5").update(listing).digest("hex");',
 			"\tconst body = Object.assign({}, req.body);",
