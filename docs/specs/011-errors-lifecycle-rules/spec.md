@@ -1,12 +1,21 @@
 # Spec 011 — Rules: errors & lifecycle (F011)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-20)
 - **Phase:** 2 — Nest specifics & Prisma
 - **Depends on:** F008 (Nest app model: providers with className/position) —
   Done; F009/F010 (pack gate, per-file model-query and in-rule AST precedent)
   — Done; F003 (engine core) — Done; F004 (framework detection) — Done
 - **Blocks:** F012 (Prisma pack reuses the pack patterns), F022 (eval corpus
   consumes this pack)
+
+## Resolution (recorded at approval, 2026-09-20)
+
+The user approved the spec as recommended ("принято"). All open questions
+resolved as recommended: (1) the leak rule keys on `.stack` only — message,
+cause and whole error objects are out; (2) comment-only `catch` bodies stay
+silent; (3) the heavy-constructor vocabulary is `child_process` calls +
+`connect`/`$connect` only — no fs/crypto double-fire with F006; (4) no new
+dependencies.
 
 ## Problem
 
