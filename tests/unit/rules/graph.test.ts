@@ -11,6 +11,7 @@ import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapte
 import { runProjectRules } from "../../../src/engine/project-rules.js";
 import type { ProjectRuleDefinition } from "../../../src/engine/registry.js";
 import { circularDependency } from "../../../src/rules/graph/circular-dependency.js";
+import { unusedFile } from "../../../src/rules/graph/unused-file.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const GRAPH_ROOT = path.resolve(import.meta.dirname, "../../fixtures/graph");
@@ -109,6 +110,49 @@ describe("backend-doctor/circular-dependency (AC-1, AC-9)", () => {
 		expect(
 			fs.existsSync(path.join(REPO_ROOT, circularDependency.docs)),
 			circularDependency.docs,
+		).toBe(true);
+	});
+});
+
+const UNUSED_FILE_MESSAGE =
+	"No entry point reaches this file through imports; it is compiled and maintained but never runs. Delete it, expose it through an entry, or import it where it is meant to be used.";
+
+describe("backend-doctor/unused-file (AC-2, AC-9)", () => {
+	it("flags files no entry point reaches (AC-2)", () => {
+		expect(
+			summarize(scanGraphFixture(unusedFile, "unused-file/invalid")),
+		).toEqual([
+			{
+				file: path.join("unused-file", "invalid", "src", "orphan.ts"),
+				line: 1,
+				column: 1,
+				message: UNUSED_FILE_MESSAGE,
+				severity: "warn",
+				category: "Maintainability",
+			},
+		]);
+	});
+
+	it("stays silent when every file is reachable (AC-2)", () => {
+		expect(scanGraphFixture(unusedFile, "unused-file/valid")).toEqual([]);
+	});
+
+	it("stays silent when no entry file exists (AC-2)", () => {
+		expect(scanGraphFixture(unusedFile, "unused-file/valid-entryless")).toEqual(
+			[],
+		);
+	});
+
+	it("ships valid/invalid fixture trees and a rule doc (AC-9)", () => {
+		for (const dir of ["valid", "invalid"]) {
+			expect(
+				fs.existsSync(path.join(GRAPH_ROOT, "unused-file", dir)),
+				dir,
+			).toBe(true);
+		}
+		expect(
+			fs.existsSync(path.join(REPO_ROOT, unusedFile.docs)),
+			unusedFile.docs,
 		).toBe(true);
 	});
 });
