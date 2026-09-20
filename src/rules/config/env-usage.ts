@@ -43,7 +43,7 @@ function isDirectEnvAccess(node: Node): boolean {
 
 function isProcessEnvBase(expression: Node): boolean {
 	const access = expression.asKind(SyntaxKind.PropertyAccessExpression);
-	if (!access || access.getName() !== "env") return false;
+	if (access?.getName() !== "env") return false;
 	const root = access.getExpression().asKind(SyntaxKind.Identifier);
 	return root?.getText() === "process";
 }
