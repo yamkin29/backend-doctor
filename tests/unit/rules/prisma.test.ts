@@ -11,6 +11,7 @@ import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapte
 import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { findManyWithoutPagination } from "../../../src/rules/prisma/find-many-without-pagination.js";
+import { noLongRunningTransaction } from "../../../src/rules/prisma/no-long-running-transaction.js";
 import { noPrismaNPlusOne } from "../../../src/rules/prisma/no-prisma-n-plus-one.js";
 import { noUnsafeRawQuery } from "../../../src/rules/prisma/no-unsafe-raw-query.js";
 
@@ -25,6 +26,7 @@ const rulesById: Record<string, RuleDefinition> = {
 	"no-prisma-n-plus-one": noPrismaNPlusOne,
 	"no-unsafe-raw-query": noUnsafeRawQuery,
 	"find-many-without-pagination": findManyWithoutPagination,
+	"no-long-running-transaction": noLongRunningTransaction,
 };
 
 /**
@@ -277,6 +279,92 @@ describe("backend-doctor/find-many-without-pagination (AC-3, AC-5, AC-9)", () =>
 		expect(
 			fs.existsSync(path.join(REPO_ROOT, findManyWithoutPagination.docs)),
 			findManyWithoutPagination.docs,
+		).toBe(true);
+	});
+});
+
+function transactionMessage(name: string): string {
+	return `${name} runs inside an interactive $transaction: the transaction holds its locks while waiting on external I/O. Move external calls and delays outside the transaction and keep only Prisma statements inside.`;
+}
+
+describe("backend-doctor/no-long-running-transaction (AC-4, AC-5, AC-9)", () => {
+	it("flags external I/O and timers inside interactive transactions with exact diagnostics (AC-4)", () => {
+		expect(
+			summarize(
+				scanFixture(
+					"no-long-running-transaction",
+					"no-long-running-transaction/invalid",
+				),
+			),
+		).toEqual([
+			{
+				file: path.join(
+					"no-long-running-transaction",
+					"invalid",
+					"axios-inside.ts",
+				),
+				line: 9,
+				column: 25,
+				message: transactionMessage("axios.get"),
+				severity: "warn",
+				category: "Performance",
+			},
+			{
+				file: path.join(
+					"no-long-running-transaction",
+					"invalid",
+					"fetch-inside.ts",
+				),
+				line: 9,
+				column: 25,
+				message: transactionMessage("fetch"),
+				severity: "warn",
+				category: "Performance",
+			},
+			{
+				file: path.join(
+					"no-long-running-transaction",
+					"invalid",
+					"timer-inside.ts",
+				),
+				line: 8,
+				column: 34,
+				message: transactionMessage("setTimeout"),
+				severity: "warn",
+				category: "Performance",
+			},
+		]);
+	});
+
+	it("stays silent on DB-only callbacks, external calls outside the callback and the array form (AC-4, AC-5)", () => {
+		expect(
+			scanFixture(
+				"no-long-running-transaction",
+				"no-long-running-transaction/valid",
+			),
+		).toEqual([]);
+	});
+
+	it("produces nothing when prisma is not detected (AC-6)", () => {
+		expect(
+			scanFixture(
+				"no-long-running-transaction",
+				"no-long-running-transaction/invalid",
+				[],
+			),
+		).toEqual([]);
+	});
+
+	it("ships valid/invalid fixtures and a rule doc (AC-9)", () => {
+		for (const dir of ["valid", "invalid"]) {
+			expect(
+				fs.existsSync(path.join(FLAT_ROOT, "no-long-running-transaction", dir)),
+				dir,
+			).toBe(true);
+		}
+		expect(
+			fs.existsSync(path.join(REPO_ROOT, noLongRunningTransaction.docs)),
+			noLongRunningTransaction.docs,
 		).toBe(true);
 	});
 });

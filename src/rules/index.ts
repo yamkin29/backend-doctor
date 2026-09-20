@@ -22,6 +22,7 @@ import { noRepositoryInController } from "./nest/no-repository-in-controller.js"
 import { providerNotRegistered } from "./nest/provider-not-registered.js";
 import { requestScopedInSingleton } from "./nest/request-scoped-in-singleton.js";
 import { findManyWithoutPagination } from "./prisma/find-many-without-pagination.js";
+import { noLongRunningTransaction } from "./prisma/no-long-running-transaction.js";
 import { noPrismaNPlusOne } from "./prisma/no-prisma-n-plus-one.js";
 import { noUnsafeRawQuery } from "./prisma/no-unsafe-raw-query.js";
 import { noCommandInjection } from "./security/no-command-injection.js";
@@ -70,6 +71,7 @@ const productRules = [
 	noAnyInDto,
 	noHeavyConstructorWork,
 	findManyWithoutPagination,
+	noLongRunningTransaction,
 	noPrismaNPlusOne,
 	noUnsafeRawQuery,
 ];
