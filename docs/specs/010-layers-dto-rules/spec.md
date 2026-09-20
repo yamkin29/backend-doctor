@@ -1,6 +1,6 @@
 # Spec 010 — Rules: layers & DTO (F010)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-20)
 - **Phase:** 2 — Nest specifics & Prisma
 - **Depends on:** F008 (Nest app model) — Done; F009 (DI rules: injections on
   model entries, `frameworks` pack gate, per-file model-query precedent) —
@@ -8,6 +8,16 @@
 - **Blocks:** F011 (reuses injection decorator names and provider method data
   for lifecycle checks), F012 (reuses DTO property data), F022 (eval corpus
   consumes this pack)
+
+## Resolution (recorded at approval, 2026-09-20)
+
+The user approved the spec as recommended ("принято"). All open questions
+resolved as recommended: (1) business logic = the branch-point count (if +
+loops + `case` clauses + ternaries), flag at ≥ 2, guard clauses silent;
+(2) repository recognition = `@InjectRepository` decorator + `Repository`
+name suffix + exact `PrismaService`/`PrismaClient`; (3) the new model fields
+are serialized in `projects[].nest` (additive, no `schemaVersion` bump, per
+the spec 009 resolution); (4) no new dependencies.
 
 ## Problem
 
