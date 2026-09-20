@@ -79,7 +79,7 @@ projects[] }`.
 | F015 | Diff scope (changed/files/lines) | 4 | Done |
 | F016 | GitHub Action (`ci install`, PR comments) | 4 | Done |
 | F017 | Agent integration (SKILL.md, rule docs, jsonl) | 4 | Done |
-| F018 | Runtime probe runner | 5 | Planned |
+| F018 | Runtime probe runner | 5 | Done |
 | F019 | Event loop & blocking attribution | 5 | Planned |
 | F020 | HTTP runtime tracing | 5 | Planned |
 | F021 | Combined report (static + runtime) | 5 | Planned |

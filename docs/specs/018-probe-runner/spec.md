@@ -1,6 +1,6 @@
 # Spec 018 — Runtime probe runner (F018)
 
-- **Status:** Approved (2026-09-21)
+- **Status:** Implemented (2026-09-21)
 - **Phase:** 5 — Runtime engine
 - **Depends on:** F001 CLI skeleton (Done — `run.ts` command wiring, exit-code
   discipline, stdout/stderr purity), F017 Agent integration (Done — the

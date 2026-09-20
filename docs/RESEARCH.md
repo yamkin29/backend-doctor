@@ -345,3 +345,30 @@ Under interop, a module **without** a default export exposes a *virtual*
 - **`AddressInfo` is exported from `node:net`, not `node:url`** — the
   natural-looking `import { type AddressInfo } from "node:url"` (next to
   `fileURLToPath`) fails typecheck.
+
+### Runtime probe (spec 018)
+
+- **`node --require` resolves a bare relative path as a module id.** A preload
+  path that is neither absolute nor `./`-prefixed goes through the node_modules
+  lookup and dies with MODULE_NOT_FOUND (`Cannot find module
+  'dist/probe/register.cjs'`). Injection code must always pass an absolute
+  path (`runProbe` does; the hook tests derive one from the repo root).
+- **`NODE_OPTIONS` accepts double-quoted values**, so the injected directive is
+  `--require "<abs path>"` — survives spaces in install paths, appends cleanly
+  to an existing value.
+- **A default-disposition signal death fires no `'exit'` event**, so the
+  preload hook cannot record `probe.detach` for a signal-killed process
+  without installing signal handlers (which would change app semantics — §7
+  intrusion). `session.json`'s `exit: { signal }` written by the parent is the
+  authoritative "how it ended" record.
+- **macOS realpath cwd bites every spawned-child path comparison.** The spec
+  015 lesson (git toplevel) recurs for `process.cwd()`: a probe (or any child)
+  spawned from an `os.tmpdir()` path reports `/private/var/...` while the test
+  holds `/var/...`. Canonicalize with `fs.realpathSync` on the *test* side;
+  the tool records what the process actually sees.
+- **tsup array configs need an array-aware globalSetup.** With the probe hook
+  the build became `allBuildOptions: Options[]` (ESM config with `clean: true`
+  first, CJS hook config with `clean: false` and
+  `outExtension: () => ({ js: ".cjs" })` second); `tests/globalSetup.ts`
+  iterates the array. The spec 017 note "second entries need no wiring" holds
+  only while `buildOptions` stays a single object.
