@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ResolvedConfig } from "../../../src/config/types.js";
@@ -348,6 +349,32 @@ describe("config pack fail-soft + config matrix (AC-4, AC-5)", () => {
 		expect(diagnostics.length).toBe(2);
 		for (const diagnostic of diagnostics) {
 			expect(diagnostic.severity).toBe("error");
+		}
+	});
+});
+
+const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
+
+describe("config pack ships fixtures and docs (AC-8)", () => {
+	it("every pack rule has valid/invalid fixtures and a rule doc", () => {
+		for (const rule of [
+			noDirectProcessEnv,
+			envWithoutValidation,
+			noCommittedEnv,
+		]) {
+			const shortId = rule.id.replace("backend-doctor/", "");
+			const scenarios = fs.readdirSync(path.join(FIXTURE_ROOT, shortId));
+			expect(
+				scenarios.some((s) => s === "invalid"),
+				`${shortId}: invalid fixtures`,
+			).toBe(true);
+			expect(
+				scenarios.some((s) => s.startsWith("valid")),
+				`${shortId}: valid fixtures`,
+			).toBe(true);
+			expect(fs.existsSync(path.join(REPO_ROOT, rule.docs)), rule.docs).toBe(
+				true,
+			);
 		}
 	});
 });
