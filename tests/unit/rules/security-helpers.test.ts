@@ -51,8 +51,7 @@ describe("containsRequestInput (spec 007 T2)", () => {
 		expect(containsRequestInput(initializerOf("req.a.b.c"))).toBe(true);
 		expect(containsRequestInput(initializerOf("(req.params.file)"))).toBe(true);
 		expect(
-			// biome-ignore lint/suspicious/noTemplateCurlyInString: the template
-			// placeholder is the test input itself, not an accidental string.
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: the placeholder is the test input
 			containsRequestInput(initializerOf("`https://${req.query.host}/x`")),
 		).toBe(true);
 		expect(
