@@ -100,15 +100,20 @@ export function runProbe(input: {
 	process.on("SIGTERM", forward);
 
 	if (parsed.durationSeconds !== null) {
-		// Graceful escalation at expiry: SIGINT now, SIGTERM/SIGKILL later if
-		// the child ignores the previous step (AC-7). Timers are cleared on
-		// child exit; child.kill on an already-dead child is a no-op.
-		child.kill("SIGINT");
+		// Graceful escalation at expiry (AC-7): SIGINT when the window ends,
+		// then SIGTERM/SIGKILL at fixed grace steps if the child ignores the
+		// previous signal. Timers are cleared on child exit; child.kill on an
+		// already-dead child is a no-op.
+		const expiryMs = parsed.durationSeconds * 1000;
+		escalationTimers.push(setTimeout(() => child.kill("SIGINT"), expiryMs));
 		escalationTimers.push(
-			setTimeout(() => child.kill("SIGTERM"), ESCALATION_STEP_MS),
+			setTimeout(() => child.kill("SIGTERM"), expiryMs + ESCALATION_STEP_MS),
 		);
 		escalationTimers.push(
-			setTimeout(() => child.kill("SIGKILL"), 2 * ESCALATION_STEP_MS),
+			setTimeout(
+				() => child.kill("SIGKILL"),
+				expiryMs + 2 * ESCALATION_STEP_MS,
+			),
 		);
 	}
 

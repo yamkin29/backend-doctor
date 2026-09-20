@@ -1,7 +1,9 @@
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { makeTmpDir, runCliAsync } from "./helpers.js";
 
 const repoRoot = path.resolve(
@@ -203,3 +205,71 @@ test("probe writes nothing of its own to stdout on usage errors", async () => {
 	expect(result.stderr).toContain("command");
 	expect(fs.existsSync(probeStorageRoot(cwd))).toBe(false);
 });
+
+test(
+	"--duration bounds the session and escalates shutdown",
+	async () => {
+		const cwd = tmpCwd();
+		const started = Date.now();
+		const result = await runCliAsync(
+			["probe", "--duration", "1", "--", "node", fixture("long.js")],
+			{ cwd },
+		);
+		const elapsedMs = Date.now() - started;
+
+		expect(result.exitCode, result.stderr).toBe(130);
+		expect(elapsedMs).toBeGreaterThanOrEqual(1000);
+		expect(elapsedMs).toBeLessThan(15000);
+
+		const doc = readSessionJson(soleSessionDir(cwd));
+		expect(doc.session.duration.requestedSeconds).toBe(1);
+		expect(doc.session.exit).toEqual({ signal: "SIGINT" });
+		// A signal-killed child has no detach line (design decision 5); the
+		// authoritative record is session.json's exit field.
+		const events = readEvents(soleSessionDir(cwd));
+		expect(events[0]?.type).toBe("probe.attach");
+	},
+	{ timeout: 30000 },
+);
+
+test(
+	"SIGINT to the probe is forwarded, the session finalized, exit 130",
+	async () => {
+		const cwd = tmpCwd();
+		const binPath = path.join(repoRoot, "dist/bin/backend-doctor.js");
+		const child = spawn(
+			process.execPath,
+			[binPath, "probe", "--duration", "30", "--", "node", fixture("long.js")],
+			{ cwd, stdio: ["ignore", "pipe", "pipe"] },
+		);
+		expect(child.pid).toBeGreaterThan(0);
+
+		// Wait until the hook is attached in the target before signaling.
+		const sessionRoot = path.join(cwd, ".backend-doctor", "probe");
+		await vi.waitUntil(
+			() => {
+				const dirs = fs.existsSync(sessionRoot)
+					? fs.readdirSync(sessionRoot)
+					: [];
+				if (dirs.length !== 1) return false;
+				return fs
+					.readFileSync(
+						path.join(sessionRoot, dirs[0] as string, "events.ndjson"),
+						"utf8",
+					)
+					.includes("probe.attach");
+			},
+			{ timeout: 15000, interval: 100 },
+		);
+
+		process.kill(child.pid as number, "SIGINT");
+		const [code, signal] = await once(child, "close");
+
+		expect(signal).toBeNull();
+		expect(code).toBe(130);
+		const doc = readSessionJson(soleSessionDir(cwd));
+		expect(doc.session.exit).toEqual({ signal: "SIGINT" });
+		expect(doc.session.duration.requestedSeconds).toBe(30);
+	},
+	{ timeout: 30000 },
+);
