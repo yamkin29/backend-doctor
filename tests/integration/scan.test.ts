@@ -640,3 +640,181 @@ describe("runScan nest app model (AC-7, AC-10, spec 008)", () => {
 		}
 	});
 });
+
+describe("runScan nest DI rules (AC-11, spec 009)", () => {
+	function writeNestDiProject(): string {
+		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "backend-doctor-di-"));
+		fs.writeFileSync(
+			path.join(tmp, "package.json"),
+			JSON.stringify({
+				name: "app",
+				dependencies: { "@nestjs/common": "^10.0.0" },
+			}),
+		);
+		fs.mkdirSync(path.join(tmp, "src"));
+		fs.writeFileSync(
+			path.join(tmp, "src", "app.module.ts"),
+			[
+				'import { Module } from "@nestjs/common";',
+				'import { OrphanService } from "./orphan.service.js";',
+				'import { TasksController } from "./tasks.controller.js";',
+				'import { TasksService } from "./tasks.service.js";',
+				'import { XService } from "./x.service.js";',
+				'import { YService } from "./y.service.js";',
+				"",
+				"@Module({",
+				"\tcontrollers: [TasksController],",
+				"\tproviders: [TasksService, XService, YService],",
+				"})",
+				"export class AppModule {}",
+			].join("\n"),
+		);
+		fs.writeFileSync(
+			path.join(tmp, "src", "tasks.service.ts"),
+			[
+				'import { Injectable } from "@nestjs/common";',
+				"",
+				"@Injectable()",
+				"export class TasksService {}",
+			].join("\n"),
+		);
+		fs.writeFileSync(
+			path.join(tmp, "src", "orphan.service.ts"),
+			[
+				'import { Injectable } from "@nestjs/common";',
+				"",
+				"@Injectable()",
+				"export class OrphanService {}",
+			].join("\n"),
+		);
+		fs.writeFileSync(
+			path.join(tmp, "src", "tasks.controller.ts"),
+			[
+				'import { Controller } from "@nestjs/common";',
+				'import { OrphanService } from "./orphan.service.js";',
+				'import { TasksService } from "./tasks.service.js";',
+				"",
+				'@Controller("tasks")',
+				"export class TasksController {",
+				"\tconstructor(",
+				"\t\tprivate readonly tasks: TasksService,",
+				"\t\tprivate readonly orphan: OrphanService,",
+				"\t) {}",
+				"}",
+			].join("\n"),
+		);
+		fs.writeFileSync(
+			path.join(tmp, "src", "x.service.ts"),
+			[
+				'import { Injectable } from "@nestjs/common";',
+				'import { YService } from "./y.service.js";',
+				"",
+				"@Injectable()",
+				"export class XService {",
+				"\tconstructor(private readonly y: YService) {}",
+				"}",
+			].join("\n"),
+		);
+		fs.writeFileSync(
+			path.join(tmp, "src", "y.service.ts"),
+			[
+				'import { Injectable } from "@nestjs/common";',
+				'import { XService } from "./x.service.js";',
+				"",
+				"@Injectable()",
+				"export class YService {",
+				"\tconstructor(private readonly x: XService) {}",
+				"}",
+			].join("\n"),
+		);
+		return tmp;
+	}
+
+	it("reports DI violations through the full pipeline for nest projects (AC-11)", async () => {
+		const tmp = writeNestDiProject();
+		try {
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(result.projects[0]?.frameworks).toEqual(["nest"]);
+			expect(result.projects[0]?.nest).toBeDefined();
+			expect(
+				result.diagnostics.map((d) => [
+					rel(result, d.filePath),
+					d.line,
+					d.column,
+					d.rule,
+					d.severity,
+				]),
+			).toEqual([
+				[
+					"src/tasks.controller.ts",
+					9,
+					3,
+					"backend-doctor/provider-not-registered",
+					"warn",
+				],
+				["src/x.service.ts", 4, 1, "backend-doctor/circular-di", "warn"],
+				[
+					"src/y.service.ts",
+					6,
+					14,
+					"backend-doctor/missing-forward-ref",
+					"warn",
+				],
+			]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("reports no DI diagnostics for a non-nest project (AC-11)", async () => {
+		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "backend-doctor-di-"));
+		try {
+			// Same wiring shapes, but no @nestjs markers: an express app with
+			// local decorators. Nest is not detected, so the DI pack never runs.
+			fs.writeFileSync(
+				path.join(tmp, "package.json"),
+				JSON.stringify({ name: "app", dependencies: { express: "^4.19.2" } }),
+			);
+			fs.mkdirSync(path.join(tmp, "src"));
+			fs.writeFileSync(
+				path.join(tmp, "src", "app.ts"),
+				[
+					"function Injectable(): ClassDecorator {",
+					"\treturn () => {};",
+					"}",
+					"",
+					"@Injectable()",
+					"export class OrphanService {}",
+					"",
+					"@Injectable()",
+					"export class TasksService {}",
+					"",
+					"@Injectable()",
+					"export class TasksController {",
+					"\tconstructor(",
+					"\t\tprivate readonly tasks: TasksService,",
+					"\t\tprivate readonly orphan: OrphanService,",
+					"\t) {}",
+					"}",
+				].join("\n"),
+			);
+
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(result.projects[0]?.frameworks).toEqual(["express"]);
+			expect(result.projects[0]?.nest).toBeUndefined();
+			expect(result.diagnostics).toEqual([]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+});

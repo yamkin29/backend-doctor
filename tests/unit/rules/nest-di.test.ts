@@ -274,3 +274,45 @@ describe("backend-doctor/request-scoped-in-singleton (AC-10, AC-14)", () => {
 		).toBe(true);
 	});
 });
+
+describe("nest DI rules without a model (AC-11)", () => {
+	const diRules = [
+		providerNotRegistered,
+		circularDi,
+		missingForwardRef,
+		requestScopedInSingleton,
+	];
+
+	it("no-op when the model is absent — the extraction-crash path (AC-11)", () => {
+		const target = path.join(
+			FIXTURE_ROOT,
+			"provider-not-registered",
+			"invalid",
+		);
+		const paths = collectFiles({
+			target,
+			extensions: SUPPORTED_EXTENSIONS,
+			excludes: [],
+			ignoreGlobs: [],
+		});
+		const adapter = new TsMorphParserAdapter();
+		const { files: views } = adapter.createProject(paths);
+
+		for (const rule of diRules) {
+			const diagnostics = views.flatMap(
+				(view) =>
+					runRules({
+						file: view,
+						rules: [rule],
+						config: defaultConfig(),
+						adapter,
+						scanRoot: target,
+						// Gate passes (nest detected) but the model is absent, exactly
+						// what runScan produces when extraction crashed.
+						detectedFrameworks: ["nest"],
+					}).diagnostics,
+			);
+			expect(diagnostics, rule.id).toEqual([]);
+		}
+	});
+});
