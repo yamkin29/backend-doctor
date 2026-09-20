@@ -996,3 +996,131 @@ describe("runScan layers & DTO pack (AC-10, AC-11, spec 010)", () => {
 		}
 	});
 });
+
+describe("runScan errors & lifecycle rules (AC-6, spec 011)", () => {
+	function writeLifecycleProject(nest: boolean): string {
+		const tmp = fs.mkdtempSync(
+			path.join(os.tmpdir(), "backend-doctor-lifecycle-"),
+		);
+		fs.writeFileSync(
+			path.join(tmp, "package.json"),
+			JSON.stringify(
+				nest
+					? { name: "nest-app", dependencies: { "@nestjs/common": "^10.0.0" } }
+					: { name: "plain-app", dependencies: {} },
+			),
+		);
+		const src = path.join(tmp, "src");
+		fs.mkdirSync(src, { recursive: true });
+		fs.writeFileSync(
+			path.join(src, "app.ts"),
+			[
+				"declare function save(error: Error): void;",
+				"",
+				"export function report(",
+				"\terror: Error,",
+				"\tres: { json(body: unknown): void },",
+				"): void {",
+				"\ttry {",
+				"\t\tsave(error);",
+				"\t} catch {}",
+				'\tres.json({ message: "failed", stack: error.stack });',
+				"}",
+			].join("\n"),
+		);
+		const service = nest
+			? [
+					'import { Injectable } from "@nestjs/common";',
+					"",
+					"declare function connect(): Promise<unknown>;",
+					"",
+					"@Injectable()",
+					"export class TimerService {",
+					"\tconstructor() {",
+					"\t\tvoid connect();",
+					"\t}",
+					"",
+					"\tonModuleInit(): void {}",
+					"}",
+				]
+			: [
+					"declare function connect(): Promise<unknown>;",
+					"",
+					"export class TimerService {",
+					"\tconstructor() {",
+					"\t\tvoid connect();",
+					"\t}",
+					"",
+					"\tonModuleInit(): void {}",
+					"}",
+				];
+		fs.writeFileSync(path.join(src, "timer.service.ts"), service.join("\n"));
+		return tmp;
+	}
+
+	it("reports the pack through the full pipeline in a nest project", async () => {
+		const tmp = writeLifecycleProject(true);
+		try {
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(
+				result.diagnostics.map((d) => [
+					rel(result, d.filePath),
+					d.line,
+					d.column,
+					d.rule,
+					d.severity,
+				]),
+			).toEqual([
+				["src/app.ts", 9, 4, "backend-doctor/no-empty-catch", "warn"],
+				["src/app.ts", 10, 2, "backend-doctor/no-error-details-leak", "warn"],
+				[
+					"src/timer.service.ts",
+					5,
+					1,
+					"backend-doctor/missing-on-module-destroy",
+					"warn",
+				],
+				[
+					"src/timer.service.ts",
+					8,
+					8,
+					"backend-doctor/no-heavy-constructor-work",
+					"warn",
+				],
+			]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("keeps the framework-free rules and silences the lifecycle pack without nest", async () => {
+		const tmp = writeLifecycleProject(false);
+		try {
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(
+				result.diagnostics.map((d) => [
+					rel(result, d.filePath),
+					d.line,
+					d.column,
+					d.rule,
+					d.severity,
+				]),
+			).toEqual([
+				["src/app.ts", 9, 4, "backend-doctor/no-empty-catch", "warn"],
+				["src/app.ts", 10, 2, "backend-doctor/no-error-details-leak", "warn"],
+			]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+});
