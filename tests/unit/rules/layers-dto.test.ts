@@ -12,6 +12,7 @@ import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapte
 import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { extractNestAppModel } from "../../../src/framework/nest/extract.js";
+import { dtoFieldWithoutValidator } from "../../../src/rules/nest/dto-field-without-validator.js";
 import { missingGlobalValidationPipe } from "../../../src/rules/nest/missing-global-validation-pipe.js";
 import { noBusinessLogicInController } from "../../../src/rules/nest/no-business-logic-in-controller.js";
 import { noGodService } from "../../../src/rules/nest/no-god-service.js";
@@ -340,5 +341,53 @@ describe("backend-doctor/missing-global-validation-pipe (AC-7, AC-14)", () => {
 
 	it("ships valid/invalid fixtures and a rule doc (AC-14)", () => {
 		expectFixturesAndDoc(missingGlobalValidationPipe, "validation-pipe");
+	});
+});
+
+describe("backend-doctor/dto-field-without-validator (AC-8, AC-14)", () => {
+	it("flags bare, ApiProperty-only and ApiPropertyOptional-only DTO properties (AC-8)", () => {
+		expect(
+			summarize(
+				scanNestFixture(dtoFieldWithoutValidator, "dto-fields/invalid"),
+			),
+		).toEqual([
+			{
+				file: path.join("dto-fields", "invalid", "create-user.dto.ts"),
+				line: 4,
+				column: 2,
+				message:
+					"email in CreateUserDto has no validation decorator; with a global ValidationPipe it is never validated. Add a class-validator decorator (@IsString, @IsInt, @IsOptional, …).",
+				severity: "warn",
+				category: "Correctness",
+			},
+			{
+				file: path.join("dto-fields", "invalid", "create-user.dto.ts"),
+				line: 6,
+				column: 2,
+				message:
+					"role in CreateUserDto has no validation decorator; with a global ValidationPipe it is never validated. Add a class-validator decorator (@IsString, @IsInt, @IsOptional, …).",
+				severity: "warn",
+				category: "Correctness",
+			},
+			{
+				file: path.join("dto-fields", "invalid", "create-user.dto.ts"),
+				line: 9,
+				column: 2,
+				message:
+					"bio in CreateUserDto has no validation decorator; with a global ValidationPipe it is never validated. Add a class-validator decorator (@IsString, @IsInt, @IsOptional, …).",
+				severity: "warn",
+				category: "Correctness",
+			},
+		]);
+	});
+
+	it("stays silent when any validator outside the blacklist decorates the field (AC-8)", () => {
+		expect(
+			scanNestFixture(dtoFieldWithoutValidator, "dto-fields/valid"),
+		).toEqual([]);
+	});
+
+	it("ships valid/invalid fixtures and a rule doc (AC-14)", () => {
+		expectFixturesAndDoc(dtoFieldWithoutValidator, "dto-fields");
 	});
 });
