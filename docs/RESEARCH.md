@@ -254,7 +254,37 @@ Under interop, a module **without** a default export exposes a *virtual*
   `create` (AST visitors) or `scan(file)` (whole-tree findings) — two rule kinds.
   We mirror this: AST rules via the adapter now, scan/graph rules from F013.
 
+### Diff scope / git plumbing (spec 015)
+
+- **`git rev-parse --show-toplevel` returns the realpath form of the work
+  tree.** On macOS `os.tmpdir()` hands out `/var/folders/...` while git
+  reports `/private/var/folders/...` — string comparison of the two spellings
+  silently filters away every changed file. Canonicalize both the scan target
+  and the git toplevel with `fs.realpathSync` before comparing, then map the
+  result back to the target's spelling so the engine sees the same path forms
+  `collectFiles` produced.
+- **Path bases differ per git subcommand:** `git diff --name-only` emits
+  repo-root-relative paths from any cwd, but `git ls-files --others` limits to
+  and reports the *current* directory. Run every scope-related git command
+  with cwd = toplevel; that is the only base where both agree.
+- **`-U0` hunk headers are the only safe thing to parse in a patch.** File
+  headers (`---`/`+++`) are ambiguous for spaces and affected by
+  `diff.noprefix`-style config; per-file diffs
+  (`git diff -U0 <base> -- <path>`) need nothing but `@@ -a[,b] +c[,d] @@`
+  lines. Count-less new side = one line; count 0 = pure deletion, no range.
+  Always pass `--no-ext-diff --no-textconv --no-color` so user-configured
+  diff helpers never run and output stays machine-shaped.
+- **Unborn `HEAD` decision order:** verify `--base` first (unresolvable →
+  error, unless it is literally the default `"HEAD"`), then `HEAD` (unborn →
+  everything counts as new/untracked), then `merge-base` (unrelated histories
+  → error). `merge-base` fails with exit 1 and *empty* output for unrelated
+  histories — the wrapper must not treat empty stdout as success.
+- `git merge-base <ref> HEAD` with `<ref> === HEAD` returns HEAD's own hash,
+  so the default `--base HEAD` degenerates cleanly into "diff HEAD to
+  worktree" without special-casing.
+
 ### Config/env pack (spec 014)
+
 
 - **The repo `.gitignore` ignores `.env` and `.env.*` at every depth.**
   Fixture dotenv files under `tests/fixtures/` must be staged with

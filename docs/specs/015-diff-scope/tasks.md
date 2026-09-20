@@ -4,13 +4,13 @@ TDD order: pure leaf modules first (types + parser), then the git-backed
 resolver, then the core consumption, then the report contract, then CLI
 wiring, then the e2e matrix, close-out last.
 
-- [ ] **T1. Scope types + `-U0` hunk parser (AC-3 machinery).** RED:
+- [x] **T1. Scope types + `-U0` hunk parser (AC-3 machinery).** RED:
   `tests/unit/scope/diff-hunks.test.ts` — canonical `@@ -a,b +c,d @@`,
   single-line `@@ -a +c @@`, new-file `@@ -0,0 +1,N @@`, deletion-only hunks
   (`+x,0` → no range), `\ No newline at end of file` tolerance, multiple
   files/hunks in one text. GREEN: `src/scope/types.ts`, `src/scope/diff.ts`.
 
-- [ ] **T2. Git wrapper + `changed`-mode resolution (AC-2, AC-7, AC-10,
+- [x] **T2. Git wrapper + `changed`-mode resolution (AC-2, AC-7, AC-10,
   AC-12 machinery).** RED: `tests/unit/scope/git-test-support.ts` (temp repo
   builder, deterministic `-c user.name/-c user.email` commits) +
   `tests/unit/scope/scope-resolver.test.ts` — tracked modified/added sets,
@@ -20,7 +20,7 @@ wiring, then the e2e matrix, close-out last.
   merge-base failure → error. GREEN: `src/scope/git.ts`, `src/scope/resolve.ts`
   (`changed` branch only).
 
-- [ ] **T3. `lines` hunk ranges + `files` set assembly (AC-3, AC-4
+- [x] **T3. `lines` hunk ranges + `files` set assembly (AC-3, AC-4
   machinery).** RED: extend `tests/unit/scope/scope-resolver.test.ts` —
   tracked file yields per-hunk ranges (edit line 2 of 6 → range around 2),
   tracked file entry exists even when ranges are empty, untracked file has no
@@ -28,7 +28,7 @@ wiring, then the e2e matrix, close-out last.
   GREEN: `resolve.ts` (`lines`/`files` branches) + any `git.ts` helper for
   per-file `-U0` diffs.
 
-- [ ] **T4. Core consumption in `runScan` (AC-9; machinery for AC-2/3/10).**
+- [x] **T4. Core consumption in `runScan` (AC-9; machinery for AC-2/3/10).**
   RED: `tests/integration/scope.test.ts` — hand-built `ResolvedScope` over a
   temp project: collected files intersected; diagnostics restricted to scoped
   files; `lines` filter keeps only in-hunk lines (absent map entry = untracked
@@ -36,20 +36,20 @@ wiring, then the e2e matrix, close-out last.
   mode and no project-rule diagnostics; `complete:false` vs `true` without
   scope. GREEN: `src/core/scan.ts` (+ `ScanInput.scope`).
 
-- [ ] **T5. Report contract mapping (report halves of AC-1/2/3/4).** RED:
+- [x] **T5. Report contract mapping (report halves of AC-1/2/3/4).** RED:
   extend `tests/unit/report.test.ts` — scope absent → `mode:"full"`, no
   `scope` key; `changed`/`lines` → `mode` + `scope:{base}`; `files` → `mode`
   without `scope` key. GREEN: `src/core/types.ts` (`ScanMode`, optional
   `ReportDocument.scope`), `src/core/report.ts`.
 
-- [ ] **T6. CLI flags + validation + wiring (AC-7/8 CLI half).** RED:
+- [x] **T6. CLI flags + validation + wiring (AC-7/8 CLI half).** RED:
   `tests/e2e/diff-scope.test.ts` first slice — `--scope files` without
   `--file`, `--file` without `--scope files`, unknown `--scope` value → exit 2,
   stderr message, empty stdout. GREEN: `src/cli/run.ts` (choices + default,
   `--base`, repeatable `--file`), `src/cli/commands/scan.ts` (combo
   validation, `resolveScope` call, `runScan` scope passthrough).
 
-- [ ] **T7. e2e matrix through the built bin (AC-1..AC-12).** RED:
+- [x] **T7. e2e matrix through the built bin (AC-1..AC-12).** RED:
   complete `tests/e2e/diff-scope.test.ts` on temp git repos — AC-1 default
   unchanged (project-rule diagnostic via `backend-doctor/unused-dependency`
   on a planted package.json); AC-2 changed set; AC-3 in/out-of-hunk +
@@ -59,10 +59,29 @@ wiring, then the e2e matrix, close-out last.
   unborn `HEAD`. GREEN: whatever the reds expose (expected: none beyond
   helper `env` support in `tests/e2e/helpers.ts`).
 
-- [ ] **T8. Close-out (no TDD).** Check off tasks, record deviations, spec
+- [x] **T8. Close-out (no TDD).** Check off tasks, record deviations, spec
   status → `Implemented`, `docs/PLAN.md` F015 → `Done`, live CLI smoke test
   with eyeballed output.
 
 ## Deviations & notes
 
-- (none yet)
+- **`ScopeMode` dependency direction flipped** (design §module layout said
+  `Exclude<ScanMode, "full">`): `src/scope/types.ts` defines the union as a
+  standalone leaf and `src/core/types.ts` imports it. Same values; keeps the
+  scope layer free of core imports and avoids a degenerate `never` union
+  between T1 and T5.
+- **macOS path canonicalization** (found by T2's red tests, not by inspection):
+  git reports the work-tree toplevel in realpath form, so on macOS
+  `os.tmpdir()`-based fixtures (`/var/folders/...`) never matched the
+  resolver's absolute paths (`/private/var/folders/...`) and every changed set
+  came back empty. Both sides are canonicalized with `fs.realpathSync` and the
+  result is mapped back to the target's spelling; recorded in RESEARCH.md.
+- **T2 green briefly contained the `lines` branch**; it was stripped before
+  the commit so T3 could run its own red → green. No product impact.
+- **`--file` is resolved against the process cwd** (approved contract); e2e
+  passes absolute paths because the spawned bin's cwd is this repo. F017's
+  agent instructions should tell agents to `cd` into the target or pass
+  absolute paths.
+- The e2e `--file`/AC-11/AC-7 scenarios initially omitted the `scan`
+  subcommand and commander answered "unknown command" with exit 2 — the
+  assertions caught it before it could mask the real behavior.

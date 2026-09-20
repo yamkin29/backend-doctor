@@ -1,7 +1,6 @@
 # Spec 015 — Diff scope: `--scope changed|files|lines` (F015)
 
-- **Status:** Approved (2026-09-20 — all open questions resolved to the
-  recommendations below)
+- **Status:** Implemented (2026-09-20)
 - **Phase:** 4 — Integrations
 - **Depends on:** F001 CLI skeleton (Done), F002 Config (Done), F003 Engine core (Done), F013 project rules (Done)
 - **Blocks:** F016 GitHub Action (inline review comments consume `--scope lines`), F017 Agent integration (SKILL.md says "run after edits, scope changed")

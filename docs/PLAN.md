@@ -76,7 +76,7 @@ projects[] }`.
 | F012 | Rules: Prisma | 2 | Done |
 | F013 | Graph rules (cycles, unused) | 3 | Done |
 | F014 | Rules: config/env | 3 | Done |
-| F015 | Diff scope (changed/files/lines) | 4 | Planned |
+| F015 | Diff scope (changed/files/lines) | 4 | Done |
 | F016 | GitHub Action (`ci install`, PR comments) | 4 | Planned |
 | F017 | Agent integration (SKILL.md, rule docs, jsonl) | 4 | Planned |
 | F018 | Runtime probe runner | 5 | Planned |
