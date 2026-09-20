@@ -127,3 +127,296 @@ describe("action.yml static contract (AC-4)", () => {
 		expect(actionYml).toContain("GITHUB_TOKEN:");
 	});
 });
+
+describe("ci report — dry run (AC-5..AC-11, AC-14)", () => {
+	let tmp: string;
+	beforeEach(() => {
+		tmp = makeTmpDir();
+	});
+	afterEach(() => {
+		fs.rmSync(tmp, { recursive: true, force: true });
+	});
+
+	const PR_EVENT = {
+		action: "synchronize",
+		number: 7,
+		pull_request: {
+			number: 7,
+			base: { ref: "main" },
+			head: { sha: "abc123" },
+		},
+	};
+
+	function writeJson(name: string, payload: unknown): string {
+		const file = path.join(tmp, name);
+		fs.writeFileSync(file, JSON.stringify(payload));
+		return file;
+	}
+
+	function reportDoc(
+		over: Record<string, unknown> = {},
+	): Record<string, unknown> {
+		const filePath = (f: string) => path.join(tmp, f);
+		return {
+			schemaVersion: 1,
+			mode: "lines",
+			scope: { base: "origin/main" },
+			directory: tmp,
+			diagnostics: [
+				{
+					id: "d1",
+					filePath: filePath("src/a.ts"),
+					line: 3,
+					column: 1,
+					rule: "backend-doctor/no-eval",
+					category: "Security",
+					severity: "error",
+					message: "eval usage",
+					tags: [],
+				},
+				{
+					id: "d2",
+					filePath: filePath("src/a.ts"),
+					line: 9,
+					column: 5,
+					rule: "backend-doctor/no-sync-fs",
+					category: "Performance",
+					severity: "warn",
+					message: "sync fs in request path",
+					tags: [],
+				},
+				{
+					id: "d3",
+					filePath: filePath("src/b.ts"),
+					line: 2,
+					column: 3,
+					rule: "backend-doctor/no-weak-crypto",
+					category: "Security",
+					severity: "warn",
+					message: "md5 usage",
+					tags: [],
+				},
+			],
+			projects: [],
+			...over,
+		};
+	}
+
+	const BASE_ENV = {
+		GITHUB_REPOSITORY: "acme/widgets",
+		GITHUB_SERVER_URL: "https://github.com",
+		GITHUB_RUN_ID: "42",
+		GITHUB_EVENT_NAME: "",
+		GITHUB_EVENT_PATH: "",
+	};
+
+	function dryRun(
+		extraArgs: string[],
+		env: Record<string, string> = {},
+		doc: Record<string, unknown> = {},
+	) {
+		const reportFile = writeJson("report.json", reportDoc(doc));
+		const eventFile = writeJson("event.json", PR_EVENT);
+		return runCli(
+			[
+				"ci",
+				"report",
+				"--report",
+				reportFile,
+				"--event",
+				eventFile,
+				"--dry-run",
+				...extraArgs,
+			],
+			{ cwd: tmp, env: { ...BASE_ENV, ...env } },
+		);
+	}
+
+	it("prints the payload envelope and exits 0 under blocking none despite error findings (AC-5)", () => {
+		const result = dryRun([]);
+		expectSuccess(result);
+		const envelope = JSON.parse(result.stdout) as Record<string, unknown>;
+		const comment = envelope.comment as { body: string };
+		expect(comment.body).toContain("**1 error, 2 warnings** found");
+		expect(comment.body).toContain("scope: lines, base: origin/main");
+		expect(
+			comment.body.trimEnd().endsWith("<!-- backend-doctor:sticky -->"),
+		).toBe(true);
+		const reviews = envelope.reviewComments as Array<{
+			path: string;
+			line: number;
+			side: string;
+			commit_id: string;
+		}>;
+		expect(reviews).toHaveLength(3);
+		expect(reviews[0]).toMatchObject({
+			path: "src/a.ts",
+			line: 3,
+			side: "RIGHT",
+			commit_id: "abc123",
+		});
+		expect(envelope.status).toMatchObject({
+			state: "success",
+			description: "1 error, 2 warnings (blocking: none)",
+			context: "backend-doctor",
+			target_url: "https://github.com/acme/widgets/actions/runs/42",
+		});
+	});
+
+	it("is byte-identical across runs (AC-14)", () => {
+		expect(dryRun([]).stdout).toBe(dryRun([]).stdout);
+	});
+
+	it("fails under blocking error with error-severity findings (AC-6)", () => {
+		const result = dryRun(["--blocking", "error"]);
+		expect(result.exitCode).toBe(1);
+		const envelope = JSON.parse(result.stdout) as {
+			status?: { state: string };
+		};
+		expect(envelope.status?.state).toBe("failure");
+	});
+
+	it("passes under blocking error with only warnings (AC-6)", () => {
+		const warnOnly = reportDoc();
+		warnOnly.diagnostics = (
+			warnOnly.diagnostics as Array<Record<string, unknown>>
+		).filter((d) => d.severity === "warn");
+		const reportFile = writeJson("warn-only.json", warnOnly);
+		const eventFile = writeJson("event.json", PR_EVENT);
+		const result = runCli(
+			[
+				"ci",
+				"report",
+				"--report",
+				reportFile,
+				"--event",
+				eventFile,
+				"--dry-run",
+				"--blocking",
+				"error",
+			],
+			{ cwd: tmp, env: BASE_ENV },
+		);
+		expectSuccess(result);
+	});
+
+	it("fails under blocking warn with any finding (AC-6)", () => {
+		const result = dryRun(["--blocking", "warn"]);
+		expect(result.exitCode).toBe(1);
+	});
+
+	it("caps review comments with the +N note (AC-7)", () => {
+		const result = dryRun(["--max-review-comments", "2"]);
+		expectSuccess(result);
+		const envelope = JSON.parse(result.stdout) as Record<string, unknown>;
+		expect(envelope.reviewComments).toHaveLength(2);
+		expect((envelope.comment as { body: string }).body).toContain(
+			"1 more omitted",
+		);
+	});
+
+	it("omits disabled surfaces (AC-8)", () => {
+		const result = dryRun([
+			"--no-comment",
+			"--no-review-comments",
+			"--no-commit-status",
+		]);
+		expectSuccess(result);
+		const envelope = JSON.parse(result.stdout) as Record<string, unknown>;
+		expect("comment" in envelope).toBe(false);
+		expect("reviewComments" in envelope).toBe(false);
+		expect("status" in envelope).toBe(false);
+		expect(result.stdout).toBe("{}\n");
+	});
+
+	it("rejects a non-PR event loudly (AC-9)", () => {
+		const reportFile = writeJson("report.json", reportDoc());
+		const eventFile = writeJson("push.json", { ref: "refs/heads/main" });
+		const result = runCli(
+			[
+				"ci",
+				"report",
+				"--report",
+				reportFile,
+				"--event",
+				eventFile,
+				"--dry-run",
+			],
+			{ cwd: tmp, env: { ...BASE_ENV, GITHUB_EVENT_NAME: "push" } },
+		);
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain("push");
+		expect(result.stdout).toBe("");
+	});
+
+	it("names the missing context (AC-10)", () => {
+		const reportFile = writeJson("report.json", reportDoc());
+		const eventFile = writeJson("event.json", PR_EVENT);
+
+		const noEvent = runCli(
+			["ci", "report", "--report", reportFile, "--dry-run"],
+			{
+				cwd: tmp,
+				env: BASE_ENV,
+			},
+		);
+		expect(noEvent.exitCode).toBe(2);
+		expect(noEvent.stderr).toContain("GITHUB_EVENT_PATH");
+
+		const noRepo = runCli(
+			[
+				"ci",
+				"report",
+				"--report",
+				reportFile,
+				"--event",
+				eventFile,
+				"--dry-run",
+			],
+			{ cwd: tmp, env: { ...BASE_ENV, GITHUB_REPOSITORY: "" } },
+		);
+		expect(noRepo.exitCode).toBe(2);
+		expect(noRepo.stderr).toContain("GITHUB_REPOSITORY");
+	});
+
+	it("rejects missing, unparseable and version-mismatched reports (AC-11)", () => {
+		const eventFile = writeJson("event.json", PR_EVENT);
+
+		const missing = runCli(
+			[
+				"ci",
+				"report",
+				"--report",
+				path.join(tmp, "nope.json"),
+				"--event",
+				eventFile,
+				"--dry-run",
+			],
+			{ cwd: tmp, env: BASE_ENV },
+		);
+		expect(missing.exitCode).toBe(2);
+		expect(missing.stderr).toContain("nope.json");
+
+		const broken = writeJson("broken.json", {});
+		fs.writeFileSync(broken, "{not json");
+		const unparseable = runCli(
+			["ci", "report", "--report", broken, "--event", eventFile, "--dry-run"],
+			{ cwd: tmp, env: BASE_ENV },
+		);
+		expect(unparseable.exitCode).toBe(2);
+
+		const future = writeJson("future.json", reportDoc({ schemaVersion: 2 }));
+		const mismatch = runCli(
+			["ci", "report", "--report", future, "--event", eventFile, "--dry-run"],
+			{ cwd: tmp, env: BASE_ENV },
+		);
+		expect(mismatch.exitCode).toBe(2);
+		expect(mismatch.stderr).toContain("schemaVersion");
+	});
+
+	it("rejects a non-positive --max-review-comments", () => {
+		const result = dryRun(["--max-review-comments", "0"]);
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain("--max-review-comments");
+	});
+});

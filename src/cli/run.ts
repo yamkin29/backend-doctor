@@ -1,6 +1,11 @@
 import { Command, CommanderError, Option } from "commander";
 import type { ReportFormat } from "../reporters/index.js";
-import { type CiInstallOptions, ciInstallCommand } from "./commands/ci.js";
+import {
+	type CiInstallOptions,
+	type CiReportOptions,
+	ciInstallCommand,
+	ciReportCommand,
+} from "./commands/ci.js";
 import { initCommand } from "./commands/init.js";
 import { type ScanCommandOptions, scanCommand } from "./commands/scan.js";
 import { resolveVersion } from "./version.js";
@@ -99,6 +104,30 @@ export async function run(argv: string[]): Promise<number> {
 		.exitOverride()
 		.action((opts: CiInstallOptions) => {
 			exit = ciInstallCommand(opts);
+		});
+
+	ci.command("report")
+		.description(
+			"Post PR surfaces (sticky comment, inline review comments, commit status) from a scan report.",
+		)
+		.requiredOption("--report <path>", "scan JSON report file")
+		.addOption(
+			new Option("--blocking <mode>", "failure policy: none|error|warn")
+				.choices(["none", "error", "warn"])
+				.default("none"),
+		)
+		.option("--event <path>", "event JSON file (default: $GITHUB_EVENT_PATH)")
+		.option("--no-comment", "skip the sticky PR summary comment")
+		.option("--no-review-comments", "skip inline review comments")
+		.option("--no-commit-status", "skip the commit status")
+		.option("--max-review-comments <n>", "inline review comment cap", "50")
+		.option(
+			"--dry-run",
+			"print the exact payloads as JSON to stdout without posting",
+		)
+		.exitOverride()
+		.action(async (opts: CiReportOptions) => {
+			exit = await ciReportCommand(opts);
 		});
 
 	try {
