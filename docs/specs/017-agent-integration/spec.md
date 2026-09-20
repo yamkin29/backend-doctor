@@ -1,6 +1,6 @@
 # Spec 017 — Agent integration: SKILL.md, rule-docs tooling, `rules` command, stable jsonl (F017)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-20)
 - **Phase:** 4 — Integrations
 - **Depends on:** F001 CLI skeleton (Done — `run.ts` command wiring, exit codes), F002
   Config (Done — rule ids validated against the registry), F003 Engine core +
@@ -343,36 +343,9 @@ The SKILL.md teaches this exact shape.
 
 ## Open questions for review
 
-1. **Scope split of "rule docs generation" between F017 and F023.** Both PLAN
-   lines mention docs tooling: F017 says "markdown rule docs generation
-   (`docs/rules/{id}.md`)", F023 says "rule docs generation script". (a) F017
-   delivers the drift gate (constitution §3's "validated by a script") plus the
-   scaffold (the "generation" half) as repo tooling, and F023 keeps only the
-   packaging/publish concerns (docs in the npm tarball, README links, canonical
-   URLs) — recommended: it makes F017 self-contained, the gate lands now while
-   41 docs are fresh, and nothing in F023 is duplicated. (b) F017 ships only
-   `rules list/explain` + SKILL.md + jsonl pinning; all docs tooling moves to
-   F023 — but that leaves the F017 PLAN line's "rule docs generation" undelivered
-   this feature. **Recommendation: (a).**
-2. **Scaffold/check runner mechanism.** The tooling core is pure TS in `src/`;
-   something must run it outside vitest. (a) Second tsup entry
-   (`dist/scripts/rule-docs.js`), invoked as
-   `pnpm build && node dist/scripts/rule-docs.js --check|--scaffold <id>` —
-   recommended: zero new dependencies, reuses the existing build that every test
-   run already performs, works under our `.js`-extension import convention;
-   touches the build config (a new build artifact), which is why it is asked.
-   (b) `node --experimental-strip-types scripts/rule-docs.ts` — rejected: plain
-   Node does not resolve our `.js`→`.ts` import spellings, so the script would
-   need its own import style. (c) New dev dependency (`tsx`) — rejected: adds a
-   dependency for a maintainer-only convenience (user-owned decision per
-   AGENTS.md, hence this question). **Recommendation: (a).**
-3. **The primary invocation the SKILL.md teaches.** (a)
-   `npx backend-doctor@latest scan --scope changed --format jsonl` after edits
-   (react-doctor precedent: "run after edits, scope changed"), full scan for
-   repo-wide audits — recommended: cheapest useful signal for an agent, and
-   jsonl is the format this spec pins. (b) Always a full scan — slower on large
-   repos and noisier (pre-existing issues drown the agent's own edits);
-   `--scope changed` exists precisely for the post-edit flow (F015). Note for
-   either choice: the `@latest` form activates at F023 publish; until then the
-   skill is forward-looking documentation, and repo-local runs use the built
-   bin. **Recommendation: (a).**
+All three were resolved on approval (2026-09-20) by adopting the
+recommendations: (1) F017 delivers the rule-docs drift gate plus the scaffold,
+F023 keeps only packaging/publish concerns; (2) the check/scaffold runner is a
+second tsup entry (`dist/scripts/rule-docs.js`), no new dependencies; (3) the
+SKILL.md teaches `npx backend-doctor@latest scan --scope changed --format jsonl`
+after edits, with a full scan for repo-wide audits.
