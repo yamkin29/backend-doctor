@@ -16,10 +16,14 @@ export interface CliResult {
 	exitCode: number;
 }
 
-export function runCli(args: string[], opts?: { cwd?: string }): CliResult {
+export function runCli(
+	args: string[],
+	opts?: { cwd?: string; env?: Record<string, string> },
+): CliResult {
 	const res = spawnSync(process.execPath, [binPath, ...args], {
 		encoding: "utf8",
 		cwd: opts?.cwd,
+		env: opts?.env ? { ...process.env, ...opts.env } : undefined,
 	});
 	return {
 		stdout: res.stdout ?? "",
