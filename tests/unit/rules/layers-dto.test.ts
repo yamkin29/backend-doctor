@@ -12,6 +12,7 @@ import { TsMorphParserAdapter } from "../../../src/engine/parser/ts-morph-adapte
 import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { extractNestAppModel } from "../../../src/framework/nest/extract.js";
+import { missingGlobalValidationPipe } from "../../../src/rules/nest/missing-global-validation-pipe.js";
 import { noBusinessLogicInController } from "../../../src/rules/nest/no-business-logic-in-controller.js";
 import { noGodService } from "../../../src/rules/nest/no-god-service.js";
 import { noRepositoryInController } from "../../../src/rules/nest/no-repository-in-controller.js";
@@ -291,5 +292,53 @@ describe("backend-doctor/no-god-service (AC-6, AC-14)", () => {
 
 	it("ships valid/invalid fixtures and a rule doc (AC-14)", () => {
 		expectFixturesAndDoc(noGodService, "god-service");
+	});
+});
+
+describe("backend-doctor/missing-global-validation-pipe (AC-7, AC-14)", () => {
+	it("flags a bootstrap with no global ValidationPipe (AC-7)", () => {
+		expect(
+			summarize(
+				scanNestFixture(missingGlobalValidationPipe, "validation-pipe/invalid"),
+			),
+		).toEqual([
+			{
+				file: path.join("validation-pipe", "invalid", "main.ts"),
+				line: 5,
+				column: 20,
+				message:
+					"NestFactory.create is called here but no global ValidationPipe is registered (no useGlobalPipes(new ValidationPipe(…)) in this file and no APP_PIPE provider in the scanned modules). Request bodies reach handlers unvalidated. Enable ValidationPipe globally in the bootstrap or provide it under the APP_PIPE token.",
+				severity: "warn",
+				category: "Configuration",
+			},
+		]);
+	});
+
+	it("stays silent when useGlobalPipes registers the pipe (AC-7)", () => {
+		expect(
+			scanNestFixture(missingGlobalValidationPipe, "validation-pipe/valid"),
+		).toEqual([]);
+	});
+
+	it("stays silent when APP_PIPE provides the pipe via a module (AC-7)", () => {
+		expect(
+			scanNestFixture(
+				missingGlobalValidationPipe,
+				"validation-pipe/valid-app-pipe",
+			),
+		).toEqual([]);
+	});
+
+	it("fails open when providers metadata is unresolved (AC-7)", () => {
+		expect(
+			scanNestFixture(
+				missingGlobalValidationPipe,
+				"validation-pipe/valid-fail-open",
+			),
+		).toEqual([]);
+	});
+
+	it("ships valid/invalid fixtures and a rule doc (AC-14)", () => {
+		expectFixturesAndDoc(missingGlobalValidationPipe, "validation-pipe");
 	});
 });
