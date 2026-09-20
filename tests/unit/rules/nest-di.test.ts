@@ -12,6 +12,7 @@ import type { RuleDefinition } from "../../../src/engine/registry.js";
 import { runRules } from "../../../src/engine/runner.js";
 import { extractNestAppModel } from "../../../src/framework/nest/extract.js";
 import { circularDi } from "../../../src/rules/nest/circular-di.js";
+import { missingForwardRef } from "../../../src/rules/nest/missing-forward-ref.js";
 import { providerNotRegistered } from "../../../src/rules/nest/provider-not-registered.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
@@ -164,6 +165,48 @@ describe("backend-doctor/circular-di (AC-8, AC-14)", () => {
 		expect(
 			fs.existsSync(
 				path.join(REPO_ROOT, "docs/rules/backend-doctor/circular-di.md"),
+			),
+		).toBe(true);
+	});
+});
+
+describe("backend-doctor/missing-forward-ref (AC-9, AC-14)", () => {
+	const rule = missingForwardRef;
+	const message = (pathText: string) =>
+		`The injection cycle ${pathText} uses no forwardRef(), so Nest cannot construct these providers and fails at bootstrap with a circular-dependency error. Wrap the type in forwardRef(() => X) on both sides or restructure.`;
+
+	it("reports the closing edge of a forwardRef-less cycle (AC-9)", () => {
+		expect(
+			summarize(scanNestFixture(rule, "missing-forward-ref/invalid")),
+		).toEqual([
+			{
+				file: path.join("missing-forward-ref", "invalid", "y.service.ts"),
+				line: 5,
+				column: 14,
+				message: message("XService → YService → XService"),
+				severity: "warn",
+				category: "Correctness",
+			},
+		]);
+	});
+
+	it("stays silent when the cycle already uses forwardRef (AC-9)", () => {
+		expect(scanNestFixture(rule, "missing-forward-ref/valid")).toEqual([]);
+	});
+
+	it("ships valid/invalid fixtures and a rule doc (AC-14)", () => {
+		for (const dir of ["valid", "invalid"]) {
+			expect(
+				fs.existsSync(path.join(FIXTURE_ROOT, "missing-forward-ref", dir)),
+				dir,
+			).toBe(true);
+		}
+		expect(
+			fs.existsSync(
+				path.join(
+					REPO_ROOT,
+					"docs/rules/backend-doctor/missing-forward-ref.md",
+				),
 			),
 		).toBe(true);
 	});

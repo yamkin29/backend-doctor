@@ -8,6 +8,7 @@ import { noCpuBoundLoop } from "./blocking/cpu-bound-loop.js";
 import { noSyncCrypto } from "./blocking/sync-crypto.js";
 import { noSyncFsInRequestPath } from "./blocking/sync-fs.js";
 import { circularDi } from "./nest/circular-di.js";
+import { missingForwardRef } from "./nest/missing-forward-ref.js";
 import { providerNotRegistered } from "./nest/provider-not-registered.js";
 import { noCommandInjection } from "./security/no-command-injection.js";
 import { noEval } from "./security/no-eval.js";
@@ -42,6 +43,7 @@ const productRules = [
 	noUnsafeMerge,
 	providerNotRegistered,
 	circularDi,
+	missingForwardRef,
 ];
 
 for (const rule of productRules) {

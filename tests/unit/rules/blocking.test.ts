@@ -235,10 +235,11 @@ describe("product registry (AC-13, spec 007)", () => {
 			"backend-doctor/no-unsafe-merge",
 			"backend-doctor/provider-not-registered",
 			"backend-doctor/circular-di",
+			"backend-doctor/missing-forward-ref",
 		]) {
 			expect(ids, id).toContain(id);
 		}
-		expect(ids).toHaveLength(18);
+		expect(ids).toHaveLength(19);
 		expect(new Set(ids).size).toBe(ids.length);
 	});
 });
