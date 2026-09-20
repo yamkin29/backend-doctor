@@ -8,7 +8,13 @@ import { noCpuBoundLoop } from "./blocking/cpu-bound-loop.js";
 import { noSyncCrypto } from "./blocking/sync-crypto.js";
 import { noSyncFsInRequestPath } from "./blocking/sync-fs.js";
 import { circularDi } from "./nest/circular-di.js";
+import { dtoFieldWithoutValidator } from "./nest/dto-field-without-validator.js";
 import { missingForwardRef } from "./nest/missing-forward-ref.js";
+import { missingGlobalValidationPipe } from "./nest/missing-global-validation-pipe.js";
+import { noAnyInDto } from "./nest/no-any-in-dto.js";
+import { noBusinessLogicInController } from "./nest/no-business-logic-in-controller.js";
+import { noGodService } from "./nest/no-god-service.js";
+import { noRepositoryInController } from "./nest/no-repository-in-controller.js";
 import { providerNotRegistered } from "./nest/provider-not-registered.js";
 import { requestScopedInSingleton } from "./nest/request-scoped-in-singleton.js";
 import { noCommandInjection } from "./security/no-command-injection.js";
@@ -46,6 +52,12 @@ const productRules = [
 	circularDi,
 	missingForwardRef,
 	requestScopedInSingleton,
+	noBusinessLogicInController,
+	noRepositoryInController,
+	noGodService,
+	missingGlobalValidationPipe,
+	dtoFieldWithoutValidator,
+	noAnyInDto,
 ];
 
 for (const rule of productRules) {
