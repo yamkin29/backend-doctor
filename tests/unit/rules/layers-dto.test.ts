@@ -445,3 +445,46 @@ describe("backend-doctor/no-any-in-dto (AC-9, AC-14)", () => {
 		expectFixturesAndDoc(noAnyInDto, "any-fields");
 	});
 });
+
+describe("pack silence paths (AC-10, AC-11)", () => {
+	it("is a no-op for every rule when the nest model is absent (AC-11)", () => {
+		const target = path.join(FIXTURE_ROOT, "controller-logic", "valid");
+		const paths = collectFiles({
+			target,
+			extensions: SUPPORTED_EXTENSIONS,
+			excludes: [],
+			ignoreGlobs: [],
+		});
+		const adapter = new TsMorphParserAdapter();
+		const { files: views } = adapter.createProject(paths);
+		const rules = [
+			noBusinessLogicInController,
+			noRepositoryInController,
+			noGodService,
+			missingGlobalValidationPipe,
+			dtoFieldWithoutValidator,
+			noAnyInDto,
+		];
+		const diagnostics: Diagnostic[] = [];
+		for (const view of views) {
+			diagnostics.push(
+				...runRules({
+					file: view,
+					rules,
+					config: defaultConfig(),
+					adapter,
+					scanRoot: target,
+					detectedFrameworks: ["nest"],
+				}).diagnostics,
+			);
+		}
+		expect(diagnostics).toEqual([]);
+	});
+
+	it("reports nothing for files without pack triggers (AC-10)", () => {
+		expect(scanNestFixture(noGodService, "controller-logic/valid")).toEqual([]);
+		expect(scanNestFixture(noAnyInDto, "controller-repository/valid")).toEqual(
+			[],
+		);
+	});
+});

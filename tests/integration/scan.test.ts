@@ -818,3 +818,181 @@ describe("runScan nest DI rules (AC-11, spec 009)", () => {
 		}
 	});
 });
+
+describe("runScan layers & DTO pack (AC-10, AC-11, spec 010)", () => {
+	function writeLayersProject(): string {
+		const tmp = fs.mkdtempSync(
+			path.join(os.tmpdir(), "backend-doctor-layers-"),
+		);
+		fs.writeFileSync(
+			path.join(tmp, "package.json"),
+			JSON.stringify({
+				name: "app",
+				dependencies: { "@nestjs/common": "^10.0.0" },
+			}),
+		);
+		fs.mkdirSync(path.join(tmp, "src"));
+		fs.writeFileSync(
+			path.join(tmp, "src", "main.ts"),
+			[
+				'import { NestFactory } from "@nestjs/core";',
+				'import { AppModule } from "./app.module.js";',
+				"",
+				"async function bootstrap(): Promise<void> {",
+				"\tconst app = await NestFactory.create(AppModule);",
+				"\tawait app.listen(3000);",
+				"}",
+				"",
+				"void bootstrap();",
+			].join("\n"),
+		);
+		fs.writeFileSync(
+			path.join(tmp, "src", "app.module.ts"),
+			[
+				'import { Module } from "@nestjs/common";',
+				'import { ReportsController } from "./reports.controller.js";',
+				'import { ReportsService } from "./reports.service.js";',
+				"",
+				"@Module({",
+				"\tcontrollers: [ReportsController],",
+				"\tproviders: [ReportsService],",
+				"})",
+				"export class AppModule {}",
+			].join("\n"),
+		);
+		fs.writeFileSync(
+			path.join(tmp, "src", "reports.controller.ts"),
+			[
+				'import { Controller, Get } from "@nestjs/common";',
+				"",
+				'@Controller("reports")',
+				"export class ReportsController {",
+				"\tconstructor(",
+				"\t\tprivate readonly reports: ReportsService,",
+				"\t\tprivate readonly rows: ReportRowsRepository,",
+				"\t) {}",
+				"",
+				"\t@Get()",
+				"\tlist(): string[] {",
+				"\t\tconst rows: string[] = [];",
+				"\t\tfor (const row of rows) {",
+				"\t\t\tif (row) {",
+				"\t\t\t\trows.push(row);",
+				"\t\t\t}",
+				"\t\t}",
+				"\t\treturn rows;",
+				"\t}",
+				"}",
+			].join("\n"),
+		);
+		fs.writeFileSync(
+			path.join(tmp, "src", "reports.service.ts"),
+			[
+				'import { Injectable } from "@nestjs/common";',
+				"",
+				"@Injectable()",
+				"export class ReportsService {}",
+			].join("\n"),
+		);
+		fs.writeFileSync(
+			path.join(tmp, "src", "create-report.dto.ts"),
+			["export class CreateReportDto {", "\ttitle: string;", "}"].join("\n"),
+		);
+		return tmp;
+	}
+
+	it("reports pack violations through the full pipeline for nest projects (AC-11)", async () => {
+		const tmp = writeLayersProject();
+		try {
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(result.projects[0]?.frameworks).toEqual(["nest"]);
+			expect(
+				result.diagnostics.map((d) => [
+					rel(result, d.filePath),
+					d.line,
+					d.column,
+					d.rule,
+					d.severity,
+				]),
+			).toEqual([
+				[
+					"src/create-report.dto.ts",
+					2,
+					2,
+					"backend-doctor/dto-field-without-validator",
+					"warn",
+				],
+				[
+					"src/main.ts",
+					5,
+					20,
+					"backend-doctor/missing-global-validation-pipe",
+					"warn",
+				],
+				[
+					"src/reports.controller.ts",
+					7,
+					3,
+					"backend-doctor/no-repository-in-controller",
+					"warn",
+				],
+				[
+					"src/reports.controller.ts",
+					10,
+					2,
+					"backend-doctor/no-business-logic-in-controller",
+					"warn",
+				],
+			]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("reports no pack diagnostics for a non-nest project (AC-11)", async () => {
+		const tmp = fs.mkdtempSync(
+			path.join(os.tmpdir(), "backend-doctor-layers-"),
+		);
+		try {
+			fs.writeFileSync(
+				path.join(tmp, "package.json"),
+				JSON.stringify({ name: "app", dependencies: { express: "^4.19.2" } }),
+			);
+			fs.mkdirSync(path.join(tmp, "src"));
+			fs.writeFileSync(
+				path.join(tmp, "src", "app.ts"),
+				[
+					'import express from "express";',
+					"",
+					"const app = express();",
+					"",
+					"class CreateReportDto {",
+					"\ttitle: string;",
+					"}",
+					"",
+					"class ReportRowsRepository {}",
+					"",
+					"export class ReportsController {",
+					"\tconstructor(private readonly rows: ReportRowsRepository) {}",
+					"}",
+				].join("\n"),
+			);
+
+			const result = await runScan({
+				directory: tmp,
+				ignore: [],
+				config: defaultConfig(),
+			});
+
+			expect(result.projects[0]?.frameworks).toEqual(["express"]);
+			expect(result.diagnostics).toEqual([]);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+});
