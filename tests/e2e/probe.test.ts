@@ -273,3 +273,93 @@ test(
 	},
 	{ timeout: 30000 },
 );
+
+async function assertUsageError(
+	args: string[],
+	cwd: string,
+	stderrFragment: string,
+): Promise<void> {
+	const result = await runCliAsync(args, { cwd });
+	expect(result.exitCode, result.stderr).toBe(2);
+	expect(result.stdout).toBe("");
+	expect(result.stderr).toContain(stderrFragment);
+	expect(fs.existsSync(probeStorageRoot(cwd))).toBe(false);
+}
+
+test(
+	"usage and environment errors: exit 2, stderr reason, empty stdout, no session",
+	async () => {
+		const okPath = fixture("ok.js");
+
+		await assertUsageError(["probe"], tmpCwd(), "command");
+		await assertUsageError(["probe", "--"], tmpCwd(), "command");
+		await assertUsageError(
+			["probe", "--duration", "abc", "--", "node", okPath],
+			tmpCwd(),
+			"--duration",
+		);
+		await assertUsageError(
+			["probe", "--duration", "0", "--", "node", okPath],
+			tmpCwd(),
+			"--duration",
+		);
+
+		const cwd = tmpCwd();
+		const filePath = path.join(cwd, "not-a-dir");
+		fs.writeFileSync(filePath, "x");
+		await assertUsageError(
+			["probe", "--out", filePath, "--", "node", okPath],
+			cwd,
+			"must be a directory",
+		);
+	},
+	{ timeout: 30000 },
+);
+
+test(
+	"missing hook preload: exit 2 and no session directory",
+	async () => {
+		const cwd = tmpCwd();
+		const hookPath = path.join(repoRoot, "dist/probe/register.cjs");
+		const hiddenPath = `${hookPath}.hidden`;
+		fs.renameSync(hookPath, hiddenPath);
+		try {
+			await assertUsageError(
+				["probe", "--", "node", fixture("ok.js")],
+				cwd,
+				"probe hook not found",
+			);
+		} finally {
+			fs.renameSync(hiddenPath, hookPath);
+		}
+	},
+	{ timeout: 30000 },
+);
+
+test(
+	"descendant node processes attach with their own pid (NODE_OPTIONS inheritance)",
+	async () => {
+		const cwd = tmpCwd();
+		const result = await runCliAsync(
+			["probe", "--", "node", fixture("descendant.js")],
+			{ cwd },
+		);
+		expect(result.exitCode, result.stderr).toBe(0);
+		expect(result.stdout).toContain("descendant-parent-output");
+
+		const events = readEvents(soleSessionDir(cwd));
+		const attaches = events.filter((event) => event.type === "probe.attach");
+		const detaches = events.filter((event) => event.type === "probe.detach");
+		expect(attaches.length).toBe(2);
+		expect(detaches.length).toBe(2);
+		const pids = new Set(attaches.map((event) => event.pid));
+		expect(pids.size).toBe(2);
+		for (const pid of pids) {
+			expect(
+				detaches.some((event) => event.pid === pid),
+				`detach recorded for pid ${String(pid)}`,
+			).toBe(true);
+		}
+	},
+	{ timeout: 30000 },
+);
