@@ -194,3 +194,76 @@ describe("resolveScope — files mode", () => {
 		expect(scope.base).toBeUndefined();
 	});
 });
+
+describe("resolveScope — lines mode", () => {
+	it("maps -U0 hunks of tracked files to inclusive ranges", async () => {
+		const repo = makeTempRepo();
+		// Six numbered lines; the edit touches line 2 only.
+		const numbered = () =>
+			Array.from(
+				{ length: 6 },
+				(_, i) => `export const v${i + 1} = ${i + 1};\n`,
+			).join("");
+		writeFiles(repo, { "a.ts": numbered() });
+		commitAll(repo, "base");
+		const edited =
+			"export const v1 = 1;\nexport const edited = true;\n" +
+			numbered().split("\n").slice(2).join("\n");
+		writeFiles(repo, { "a.ts": edited });
+
+		const scope = expectOk(
+			await resolveScope({ target: repo, mode: "lines", base: "HEAD" }),
+		);
+		const ranges = scope.lineRanges.get(path.join(repo, "a.ts"));
+		expect(ranges).toBeDefined();
+		expect(ranges).toContainEqual({ start: 2, end: 2 });
+	});
+
+	it("keeps an entry (possibly empty) for tracked files and none for untracked", async () => {
+		const repo = makeTempRepo();
+		writeFiles(repo, { "a.ts": "one\n" });
+		commitAll(repo, "base");
+		writeFiles(repo, { "a.ts": "one\ntwo\n", "u.ts": "fresh\n" });
+
+		const scope = expectOk(
+			await resolveScope({ target: repo, mode: "lines", base: "HEAD" }),
+		);
+		// a.ts changed with an appended line → non-empty ranges.
+		expect(scope.lineRanges.get(path.join(repo, "a.ts"))).toEqual([
+			{ start: 2, end: 2 },
+		]);
+		// Untracked files have no diff → no entry → whole file counts as changed.
+		expect(scope.lineRanges.has(path.join(repo, "u.ts"))).toBe(false);
+	});
+
+	it("restricts files and ranges to a subdirectory target", async () => {
+		const repo = makeTempRepo();
+		writeFiles(repo, { "sub/a.ts": "one\n", "root.ts": "one\n" });
+		commitAll(repo, "base");
+		writeFiles(repo, { "sub/a.ts": "one\ntwo\n", "root.ts": "one\ntwo\n" });
+
+		const scope = expectOk(
+			await resolveScope({
+				target: path.join(repo, "sub"),
+				mode: "lines",
+				base: "HEAD",
+			}),
+		);
+		expect(sortedFiles(scope)).toEqual([path.join(repo, "sub", "a.ts")]);
+		expect(scope.lineRanges.has(path.join(repo, "root.ts"))).toBe(false);
+		expect(scope.lineRanges.get(path.join(repo, "sub", "a.ts"))).toEqual([
+			{ start: 2, end: 2 },
+		]);
+	});
+
+	it("carries the resolved base for the report", async () => {
+		const repo = makeTempRepo();
+		writeFiles(repo, { "a.ts": "one\n" });
+		commitAll(repo, "base");
+
+		const scope = expectOk(
+			await resolveScope({ target: repo, mode: "lines", base: "HEAD" }),
+		);
+		expect(scope.base).toBe("HEAD");
+	});
+});

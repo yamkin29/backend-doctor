@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import { parseHunks } from "./diff.js";
 import { nulFields, runGit } from "./git.js";
-import type { ResolvedScope, ScopeMode } from "./types.js";
+import type { LineRange, ResolvedScope, ScopeMode } from "./types.js";
 
 export interface ScopeRequest {
 	/** Absolute scan target (directory or file). */
@@ -76,19 +77,27 @@ export async function resolveScope(
 
 	const baseResolves = await refResolves(top, request.base);
 	let tracked: string[];
+	// Defined whenever there is history to diff against; `lines` mode needs
+	// it later, and unborn cases leave it undefined with `tracked` empty.
+	let mergeBase: string | undefined;
 	if (baseResolves) {
 		// Design decision 7b: a valid --base but unborn HEAD — there is no
 		// history to merge against, so every file counts as new.
 		if (!(await refResolves(top, "HEAD"))) {
 			tracked = [];
 		} else {
-			const mergeBase = await runGit(top, ["merge-base", request.base, "HEAD"]);
-			if (!mergeBase.ok) {
+			const mergeBaseOut = await runGit(top, [
+				"merge-base",
+				request.base,
+				"HEAD",
+			]);
+			if (!mergeBaseOut.ok) {
 				return {
 					ok: false,
 					error: `no common ancestor between "${request.base}" and HEAD in ${top}`,
 				};
 			}
+			mergeBase = mergeBaseOut.stdout.trim();
 			const changed = await runGit(top, [
 				"diff",
 				"--name-only",
@@ -97,7 +106,7 @@ export async function resolveScope(
 				"--no-color",
 				"--no-ext-diff",
 				"--no-textconv",
-				mergeBase.stdout.trim(),
+				mergeBase,
 			]);
 			if (!changed.ok) {
 				return {
@@ -142,12 +151,44 @@ export async function resolveScope(
 		.filter(admits)
 		.map((abs) => path.join(scopeRoot, path.relative(realScopeRoot, abs)));
 
+	const lineRanges = new Map<string, readonly LineRange[]>();
+	if (request.mode === "lines" && mergeBase !== undefined) {
+		for (const rel of tracked.filter((rel) => admits(path.join(top, rel)))) {
+			const diff = await runGit(top, [
+				"diff",
+				"--no-color",
+				"--no-ext-diff",
+				"--no-textconv",
+				"-U0",
+				mergeBase,
+				"--",
+				rel,
+			]);
+			if (!diff.ok) {
+				return {
+					ok: false,
+					error:
+						diff.kind === "missing-git"
+							? GIT_MISSING
+							: `git diff -U0 failed for ${rel}: ${diff.detail}`,
+				};
+			}
+			// Tracked changed files always get an entry — empty means no
+			// line-level change, so every diagnostic in the file is filtered.
+			// Untracked files get none: their whole content counts as changed.
+			lineRanges.set(
+				path.join(scopeRoot, path.relative(realScopeRoot, path.join(top, rel))),
+				parseHunks(diff.stdout),
+			);
+		}
+	}
+
 	return {
 		ok: true,
 		scope: {
 			mode: request.mode,
 			files: new Set(files),
-			lineRanges: new Map(),
+			lineRanges,
 			base: request.base,
 		},
 	};
