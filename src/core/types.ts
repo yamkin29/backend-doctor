@@ -48,6 +48,16 @@ export type ScanMode = "full" | ScopeMode;
 
 export const REPORT_SCHEMA_VERSION = 1;
 
+/**
+ * Trace provenance for the combined report (spec 021): present only when a
+ * scan merged a probe session via `--trace`. Additive — reports without a
+ * trace carry no `runtime` key at all (schemaVersion stays 1).
+ */
+export interface RuntimeProvenance {
+	sessionDir: string;
+	traceSchemaVersion: 1;
+}
+
 export interface ProjectInfo {
 	packageRoot: string;
 	frameworks: string[];
@@ -73,4 +83,9 @@ export interface ReportDocument {
 	directory: string;
 	diagnostics: Diagnostic[];
 	projects: ProjectInfo[];
+	/**
+	 * Present only when a probe session was merged via `scan --trace`
+	 * (spec 021); appended as the document's last key.
+	 */
+	runtime?: RuntimeProvenance;
 }
