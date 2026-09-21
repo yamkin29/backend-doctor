@@ -374,7 +374,11 @@ test(
 interface FindingsJson {
 	traceSchemaVersion: number;
 	sessionId: string;
-	collectors: { blockThresholdMs: number; lagIntervalMs: number };
+	collectors: {
+		blockThresholdMs: number;
+		lagIntervalMs: number;
+		n1Threshold: number;
+	};
 	loopLag: {
 		windows: number;
 		count: number;
@@ -396,6 +400,31 @@ interface FindingsJson {
 			function: string | null;
 			asyncRootType: string;
 		}>;
+	};
+	http: {
+		requests: number;
+		endpoints: Array<{
+			method: string;
+			route: string;
+			count: number;
+			p50Ms: number;
+			p99Ms: number;
+			maxMs: number;
+			statuses: Record<string, number>;
+			dbQueries: { total: number; max: number; avg: number };
+		}>;
+	};
+	db: {
+		queries: number;
+		totalMs: number;
+		unattributed: number;
+		models: Array<{ model: string | null; action: string; count: number }>;
+	};
+	memory: {
+		samples: number;
+		peakRssMb: number;
+		peakHeapUsedMb: number;
+		gc: { count: number; totalPauseMs: number; maxPauseMs: number };
 	};
 	events: { lines: number; malformedLines: number; attachProcesses: number };
 	warnings: string[];
@@ -566,6 +595,122 @@ test(
 		const findings = readFindings(soleSessionDir(cwd));
 		expect(findings.loopLag.windows).toBeGreaterThanOrEqual(2);
 		expect(findings.loopLag.count).toBeGreaterThan(0);
+	},
+	{ timeout: 30000 },
+);
+
+test(
+	"probe records an http session: endpoints, summary, unchanged session.json",
+	async () => {
+		const cwd = tmpCwd();
+		const result = await runCliAsync(
+			["probe", "--", "node", fixture("http-app.cjs")],
+			{ cwd },
+		);
+		expect(result.exitCode, result.stderr).toBe(0);
+		expect(result.stdout).toBe("http-app-done\n");
+
+		const sessionDir = soleSessionDir(cwd);
+		assertCommonSession(sessionDir, cwd, ["node", fixture("http-app.cjs")]);
+
+		const findings = readFindings(sessionDir);
+		expect(findings.http.requests).toBe(4);
+		const users = findings.http.endpoints.find(
+			(endpoint) => endpoint.route === "/users/:id",
+		);
+		expect(users, "express-marker route pattern").toBeDefined();
+		expect(users?.method).toBe("GET");
+		expect(users?.count).toBe(2);
+		expect(users?.statuses).toEqual({ 200: 2 });
+		expect(users?.dbQueries).toEqual({ total: 0, max: 0, avg: 0 });
+		expect(
+			findings.http.endpoints.some((endpoint) => endpoint.route === "/abort"),
+		).toBe(false);
+
+		// AC-18: the stderr summary names the http request count.
+		expect(result.stderr).toContain("findings.json");
+		expect(result.stderr).toContain("4 http request(s)");
+	},
+	{ timeout: 30000 },
+);
+
+test(
+	"probe records prisma queries per request and warns on N+1 via the knob",
+	async () => {
+		const cwd = tmpCwd();
+		const result = await runCliAsync(
+			["probe", "--", "node", fixture("prisma-app.cjs")],
+			{
+				cwd,
+				env: { BACKEND_DOCTOR_PROBE_N1_THRESHOLD: "2" },
+			},
+		);
+		expect(result.exitCode, result.stderr).toBe(0);
+		expect(result.stdout).toBe("prisma-app-done\n");
+
+		const findings = readFindings(soleSessionDir(cwd));
+		expect(findings.db.queries).toBe(4);
+		expect(findings.db.unattributed).toBe(1);
+		expect(findings.db.models).toEqual([
+			{ model: "User", action: "findMany", count: 3 },
+			{ model: null, action: "queryRaw", count: 1 },
+		]);
+
+		const bulk = findings.http.endpoints.find(
+			(endpoint) => endpoint.route === "/bulk",
+		);
+		expect(bulk?.dbQueries).toEqual({ total: 3, max: 3, avg: 3 });
+		expect(findings.warnings).toContain(
+			"endpoint GET /bulk saw up to 3 db queries in one request (possible N+1)",
+		);
+	},
+	{ timeout: 30000 },
+);
+
+test(
+	"invalid BACKEND_DOCTOR_PROBE_N1_THRESHOLD is a usage error before spawn",
+	async () => {
+		const cwd = tmpCwd();
+		const result = await runCliAsync(
+			["probe", "--", "node", fixture("ok.js")],
+			{ cwd, env: { BACKEND_DOCTOR_PROBE_N1_THRESHOLD: "abc" } },
+		);
+		expect(result.exitCode).toBe(2);
+		expect(result.stdout).toBe("");
+		expect(result.stderr).toContain("BACKEND_DOCTOR_PROBE_N1_THRESHOLD");
+		expect(fs.existsSync(probeStorageRoot(cwd))).toBe(false);
+	},
+	{ timeout: 30000 },
+);
+
+test(
+	"not-Node targets produce structural zero states for the new sections",
+	async () => {
+		const cwd = tmpCwd();
+		const result = await runCliAsync(
+			["probe", "--", "sh", "-c", "echo not-node"],
+			{ cwd },
+		);
+		expect(result.exitCode, result.stderr).toBe(0);
+		expect(result.stdout).toBe("not-node\n");
+
+		const findings = readFindings(soleSessionDir(cwd));
+		expect(findings.http).toEqual({ requests: 0, endpoints: [] });
+		expect(findings.db).toEqual({
+			queries: 0,
+			totalMs: 0,
+			unattributed: 0,
+			models: [],
+		});
+		expect(findings.memory).toEqual({
+			samples: 0,
+			peakRssMb: 0,
+			peakHeapUsedMb: 0,
+			gc: { count: 0, totalPauseMs: 0, maxPauseMs: 0 },
+		});
+		expect(findings.warnings).toContain(
+			"no probe events recorded — the target may not be Node or the hook did not load",
+		);
 	},
 	{ timeout: 30000 },
 );

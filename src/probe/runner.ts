@@ -73,7 +73,8 @@ function finalizeFindings(
 		process.stderr.write(
 			`${NOTICE_PREFIX} findings written to ${findingsPath} — ` +
 				`${findings.blocking.count} blocking call(s) >= ${collectors.blockThresholdMs}ms ` +
-				`(total ${round1(findings.blocking.totalMs)}ms), lag p99 ${round1(findings.loopLag.p99Ms)}ms\n`,
+				`(total ${round1(findings.blocking.totalMs)}ms), lag p99 ${round1(findings.loopLag.p99Ms)}ms, ` +
+				`${findings.http.requests} http request(s)\n`,
 		);
 	} catch (error) {
 		process.stderr.write(
