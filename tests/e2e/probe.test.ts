@@ -115,9 +115,14 @@ test(
 		expect(doc.session.duration.effectiveMs).toBeGreaterThanOrEqual(0);
 
 		const events = readEvents(sessionDir);
-		expect(events).toHaveLength(2);
+		// Spec 019: the parent-set collectors add a final loop.lag flush, so
+		// the stream is bracketed by attach/detach rather than exactly 2 lines.
+		expect(events.length).toBeGreaterThanOrEqual(3);
 		expect(events[0]?.type).toBe("probe.attach");
-		expect(events[1]?.type).toBe("probe.detach");
+		expect(events[events.length - 1]?.type).toBe("probe.detach");
+		const lags = events.filter((event) => event.type === "loop.lag");
+		expect(lags).toHaveLength(1);
+		expect(lags[0]?.final).toBe(true);
 		expect(events[0]?.pid).toBe(doc.session.pid);
 	},
 	{ timeout: 30000 },
@@ -150,7 +155,9 @@ test("probe passes the child exit code through and records it", async () => {
 	const doc = readSessionJson(soleSessionDir(cwd));
 	expect(doc.session.exit).toEqual({ code: 3 });
 	const events = readEvents(soleSessionDir(cwd));
-	expect(events[1]?.code).toBe(3);
+	const detach = events[events.length - 1];
+	expect(detach?.type).toBe("probe.detach");
+	expect(detach?.code).toBe(3);
 });
 
 test("two probe runs create distinct session directories", async () => {

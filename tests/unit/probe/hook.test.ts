@@ -42,6 +42,11 @@ function makeEventsPath(): string {
 	);
 }
 
+const COLLECTORS = JSON.stringify({
+	blockThresholdMs: 10,
+	lagIntervalMs: 1000,
+});
+
 function parseEvents(filePath: string): Array<Record<string, unknown>> {
 	return fs
 		.readFileSync(filePath, "utf8")
@@ -138,4 +143,96 @@ test("hook with an unwritable events path: notice, inert, host unaffected", () =
 	expect(res.status).toBe(0);
 	expect(res.stdout).toBe("probe-ok-output\n");
 	expect(res.stderr).toContain("backend-doctor probe");
+});
+
+test("collectors: attach carries the block, final lag flush precedes detach", () => {
+	const eventsPath = makeEventsPath();
+	const res = spawnHost(path.join(fixturesDir, "ok.js"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		BACKEND_DOCTOR_PROBE_COLLECTORS: COLLECTORS,
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+	expect(res.stdout).toBe("probe-ok-output\n");
+
+	const events = parseEvents(eventsPath);
+	expect(events.length).toBeGreaterThanOrEqual(3);
+	const attach = events[0];
+	const last = events[events.length - 1];
+	expect(attach?.type).toBe("probe.attach");
+	expect(attach?.collectors).toEqual({
+		blockThresholdMs: 10,
+		lagIntervalMs: 1000,
+	});
+	expect(last?.type).toBe("probe.detach");
+
+	// A short-lived process emits exactly the final flush (the unref'd window
+	// timer never fires), with the cumulative total block.
+	const lags = events.filter((event) => event.type === "loop.lag");
+	expect(lags).toHaveLength(1);
+	const lag = lags[0] as Record<string, unknown>;
+	expect(lag.final).toBe(true);
+	expect(lag.periodMs).toBe(1000);
+	expect(typeof lag.count).toBe("number");
+	for (const key of ["p50Ms", "p99Ms", "maxMs"] as const) {
+		expect(typeof lag[key]).toBe("number");
+	}
+	const total = lag.total as Record<string, unknown>;
+	for (const key of ["count", "p50Ms", "p99Ms", "maxMs"] as const) {
+		expect(typeof total[key]).toBe("number");
+	}
+	// count may legitimately be 0: an immediately-exiting process records no
+	// loop turns at all.
+	// Ordering guarantee: the final flush sits right before the detach line.
+	expect(events.indexOf(lag)).toBe(events.length - 2);
+});
+
+test(
+	"collectors: periodic non-final windows appear in long sessions",
+	() => {
+		const eventsPath = makeEventsPath();
+		const res = spawnHost(path.join(fixturesDir, "spin.cjs"), {
+			BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+			BACKEND_DOCTOR_PROBE_COLLECTORS: JSON.stringify({
+				blockThresholdMs: 10,
+				lagIntervalMs: 300,
+			}),
+		});
+		expect(res.status, res.statusMessage).toBe(0);
+		expect(res.stdout).toContain("spin-done");
+
+		const events = parseEvents(eventsPath);
+		const windows = events.filter(
+			(event) => event.type === "loop.lag" && event.final === false,
+		);
+		expect(windows.length).toBeGreaterThanOrEqual(2);
+		for (const window of windows) {
+			expect(typeof window.periodMs).toBe("number");
+			// count may still be 0: monitorEventLoopDelay's sampling granularity
+			// does not guarantee a recorded sample per wall-clock window.
+			expect(typeof window.count).toBe("number");
+			expect(typeof window.p50Ms).toBe("number");
+		}
+		const finals = events.filter(
+			(event) => event.type === "loop.lag" && event.final === true,
+		);
+		expect(finals).toHaveLength(1);
+	},
+	{ timeout: 15000 },
+);
+
+test("malformed collectors JSON: one notice, lifecycle-only", () => {
+	const eventsPath = makeEventsPath();
+	const res = spawnHost(path.join(fixturesDir, "ok.js"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		BACKEND_DOCTOR_PROBE_COLLECTORS: "not-json",
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+	expect(res.stderr).toContain("collectors");
+
+	const events = parseEvents(eventsPath);
+	expect(events.map((event) => event.type)).toEqual([
+		"probe.attach",
+		"probe.detach",
+	]);
+	expect(events[0]?.collectors).toBeUndefined();
 });
