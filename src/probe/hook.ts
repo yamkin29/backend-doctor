@@ -10,6 +10,7 @@ import asyncHooks from "node:async_hooks";
 import childProcess from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
 import {
 	constants,
@@ -445,10 +446,16 @@ function installBlockingCollector(settings: CollectorSettings): void {
 function installCollectors(settings: CollectorSettings): void {
 	// Per-collector isolation (spec 020 AC-7): one collector failing to
 	// install must not take down the others; each notice names its collector.
+	// The ALS instance is shared: the HTTP collector scopes each request into
+	// a store, the DB collector reads it when a query runs.
+	const requestContext = new asyncHooks.AsyncLocalStorage<{
+		dbQueries: number;
+	}>();
 	const installs: Array<[string, () => void]> = [
 		["event-loop lag", () => installLagMonitor(settings)],
 		["blocking-call", () => installBlockingCollector(settings)],
 		["memory/gc", () => installMemoryCollector(settings)],
+		["http", () => installHttpCollector(requestContext)],
 	];
 	for (const [name, install] of installs) {
 		try {
@@ -459,6 +466,121 @@ function installCollectors(settings: CollectorSettings): void {
 			);
 		}
 	}
+}
+
+// ---- HTTP collector (spec 020) ----
+
+interface RequestLike extends Record<string, unknown> {}
+
+type ServerEmit = typeof http.Server.prototype.emit;
+
+const EMIT_MARKER = "__backendDoctorProbeEmitWrapped";
+
+/**
+ * Route attribution (spec 020 AC-2): Express sets req.route (+ req.baseUrl)
+ * during dispatch, Fastify exposes routerPath (v4) or routeOptions.url (v5);
+ * a RegExp route path falls through to the URL pathname without query.
+ */
+function routeFromRequest(req: RequestLike): string {
+	const route = req.route as { path?: unknown } | undefined;
+	if (route !== undefined && route !== null && typeof route.path === "string") {
+		const base = typeof req.baseUrl === "string" ? req.baseUrl : "";
+		return `${base}${route.path}`;
+	}
+	const fastifyRoute =
+		req.routerPath ?? (req.routeOptions as { url?: unknown } | undefined)?.url;
+	if (typeof fastifyRoute === "string") return fastifyRoute;
+	const url = req.url;
+	if (typeof url === "string") {
+		try {
+			return new URL(url, "http://localhost").pathname;
+		} catch {
+			return url;
+		}
+	}
+	return "";
+}
+
+/**
+ * Wraps Server.prototype.emit so every `request` dispatch runs inside a
+ * fresh ALS store; the response's `finish` records one http.request event.
+ * Requests that never finish (aborted) record nothing (AC-8). Verified live:
+ * the original emit must be applied through a closure with the server as
+ * `this` — handing the unbound method to als.run crashes the host.
+ */
+function installHttpCollector(
+	requestContext: asyncHooks.AsyncLocalStorage<{ dbQueries: number }>,
+): void {
+	const originalEmit: ServerEmit = http.Server.prototype.emit;
+	let disabled = false;
+	// The passthrough must re-join the event name with the rest args: calling
+	// the original with the rest only silently becomes emit(undefined) and
+	// every listener (including "listening" and "request") never runs.
+	const passthrough = function (
+		this: unknown,
+		event: string,
+		args: unknown[],
+	): unknown {
+		return (originalEmit as (...emitArgs: unknown[]) => unknown).apply(this, [
+			event,
+			...args,
+		]);
+	};
+	const wrappedEmit = function (
+		this: unknown,
+		event: string,
+		...args: unknown[]
+	): unknown {
+		if (disabled || event !== "request") {
+			return passthrough.call(this, event, args);
+		}
+		const req = args[0] as RequestLike | undefined;
+		const res = args[1] as
+			| {
+					once?: (name: string, listener: () => void) => unknown;
+					statusCode?: number;
+			  }
+			| undefined;
+		if (
+			req === undefined ||
+			res === undefined ||
+			typeof res.once !== "function"
+		) {
+			return passthrough.call(this, event, args);
+		}
+		const store = { dbQueries: 0 };
+		const startedAt = performance.now();
+		res.once("finish", () => {
+			if (disabled) return;
+			try {
+				writeEvent({
+					type: "http.request",
+					timestamp: new Date().toISOString(),
+					pid: process.pid,
+					method: typeof req.method === "string" ? req.method : "",
+					route: routeFromRequest(req),
+					status: typeof res.statusCode === "number" ? res.statusCode : 0,
+					durationMs: roundMs(performance.now() - startedAt),
+					dbQueries: store.dbQueries,
+				});
+			} catch (error) {
+				disabled = true;
+				notice(`http collector disabled (${(error as Error).message})`);
+			}
+		});
+		return requestContext.run(store, () => passthrough.call(this, event, args));
+	};
+	Object.defineProperty(wrappedEmit, "name", {
+		value: "emit",
+		configurable: true,
+	});
+	// Non-enumerable marker: the observable "is this instrumented" probe.
+	Object.defineProperty(wrappedEmit, EMIT_MARKER, {
+		value: true,
+		enumerable: false,
+		configurable: true,
+	});
+	http.Server.prototype.emit = wrappedEmit as ServerEmit;
 }
 
 // ---- memory/GC collector (spec 020) ----

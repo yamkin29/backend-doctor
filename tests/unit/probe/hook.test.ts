@@ -444,3 +444,73 @@ test("memory: periodic samples with well-typed fields; gc events stay structural
 	// host alive (the fixture exits on its own timer, and we got here).
 	expect(events[events.length - 1]?.type).toBe("probe.detach");
 }, 15000);
+
+function httpRequests(eventsPath: string): Array<Record<string, unknown>> {
+	return parseEvents(eventsPath).filter(
+		(event) => event.type === "http.request",
+	);
+}
+
+test("http: completed cycles record events with routes; the aborted one records nothing", () => {
+	const eventsPath = makeEventsPath();
+	const res = spawnHost(path.join(fixturesDir, "http-app.cjs"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		BACKEND_DOCTOR_PROBE_COLLECTORS: COLLECTORS,
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+	expect(res.stdout).toContain("http-app-done");
+
+	const requests = httpRequests(eventsPath);
+	expect(requests, "aborted request excluded (AC-8)").toHaveLength(4);
+
+	const users = requests.filter((event) => event.route === "/users/:id");
+	expect(users, "express marker yields the pattern (AC-2)").toHaveLength(2);
+	for (const request of users) {
+		expect(request.method).toBe("GET");
+		expect(request.status).toBe(200);
+		expect(request.dbQueries).toBe(0);
+		expect(request.durationMs).toBeGreaterThanOrEqual(0);
+		expect(typeof request.timestamp).toBe("string");
+		expect(typeof request.pid).toBe("number");
+	}
+	expect(
+		requests.some((event) => event.route === "/plain" && event.status === 201),
+	).toBe(true);
+	expect(
+		requests.some(
+			(event) => event.route === "/missing" && event.status === 404,
+		),
+		"no marker falls back to the pathname (AC-2)",
+	).toBe(true);
+}, 15000);
+
+test("http inert: emit stays native without the collectors env", () => {
+	const check =
+		'const http = require("node:http"); console.log(http.Server.prototype.emit.__backendDoctorProbeEmitWrapped === true ? "patched" : "native");';
+
+	const inert = spawnSync(
+		process.execPath,
+		["--require", hookPath, "-e", check],
+		{
+			encoding: "utf8",
+			env: { ...process.env, BACKEND_DOCTOR_PROBE_EVENTS: undefined },
+			timeout: 15000,
+		},
+	);
+	expect(inert.stdout?.trim()).toBe("native");
+
+	const active = spawnSync(
+		process.execPath,
+		["--require", hookPath, "-e", check],
+		{
+			encoding: "utf8",
+			env: {
+				...process.env,
+				BACKEND_DOCTOR_PROBE_EVENTS: makeEventsPath(),
+				BACKEND_DOCTOR_PROBE_COLLECTORS: COLLECTORS,
+			},
+			timeout: 15000,
+		},
+	);
+	expect(active.stdout?.trim()).toBe("patched");
+});
