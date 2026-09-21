@@ -430,6 +430,9 @@ test(
 			"collectors",
 			"loopLag",
 			"blocking",
+			"http",
+			"db",
+			"memory",
 			"events",
 			"warnings",
 		]);

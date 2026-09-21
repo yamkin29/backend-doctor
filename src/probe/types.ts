@@ -106,6 +106,49 @@ export interface ProbeLoopLagEvent {
 	total: ProbeLoopLagTotal;
 }
 
+/** One completed HTTP request/response cycle (spec 020). */
+export interface ProbeHttpRequestEvent {
+	type: "http.request";
+	timestamp: string;
+	pid: number;
+	method: string;
+	route: string;
+	status: number;
+	durationMs: number;
+	dbQueries: number;
+}
+
+/** One instrumented Prisma query (spec 020). */
+export interface ProbeDbQueryEvent {
+	type: "db.query";
+	timestamp: string;
+	pid: number;
+	model: string | null;
+	action: string;
+	durationMs: number;
+	attributed: boolean;
+}
+
+/** One periodic memory sample in MB (spec 020). */
+export interface ProbeMemSampleEvent {
+	type: "mem.sample";
+	timestamp: string;
+	pid: number;
+	rssMb: number;
+	heapUsedMb: number;
+	heapTotalMb: number;
+	externalMb: number;
+}
+
+/** One observed garbage collection (spec 020). */
+export interface ProbeGcPauseEvent {
+	type: "gc.pause";
+	timestamp: string;
+	pid: number;
+	kind: string;
+	durationMs: number;
+}
+
 /** One aggregated blocking site in findings.json (spec 019). */
 export interface FindingsCall {
 	api: string;
@@ -139,13 +182,67 @@ export interface FindingsEvents {
 	attachProcesses: number;
 }
 
-/** The `findings.json` document written at finalize (spec 019). */
+/** Per-endpoint db-query counts (spec 020). */
+export interface FindingsEndpointDbQueries {
+	total: number;
+	max: number;
+	avg: number;
+}
+
+/** One aggregated endpoint row in findings.json (spec 020). */
+export interface FindingsEndpoint {
+	method: string;
+	route: string;
+	count: number;
+	p50Ms: number;
+	p99Ms: number;
+	maxMs: number;
+	statuses: Record<string, number>;
+	dbQueries: FindingsEndpointDbQueries;
+}
+
+export interface FindingsHttp {
+	requests: number;
+	endpoints: FindingsEndpoint[];
+}
+
+/** One aggregated (model, action) row in findings.json (spec 020). */
+export interface FindingsDbModel {
+	model: string | null;
+	action: string;
+	count: number;
+}
+
+export interface FindingsDb {
+	queries: number;
+	totalMs: number;
+	unattributed: number;
+	models: FindingsDbModel[];
+}
+
+export interface FindingsGc {
+	count: number;
+	totalPauseMs: number;
+	maxPauseMs: number;
+}
+
+export interface FindingsMemory {
+	samples: number;
+	peakRssMb: number;
+	peakHeapUsedMb: number;
+	gc: FindingsGc;
+}
+
+/** The `findings.json` document written at finalize (specs 019/020). */
 export interface FindingsDocument {
 	traceSchemaVersion: typeof TRACE_SCHEMA_VERSION;
 	sessionId: string;
 	collectors: ProbeCollectorsSettings;
 	loopLag: FindingsLoopLag;
 	blocking: FindingsBlocking;
+	http: FindingsHttp;
+	db: FindingsDb;
+	memory: FindingsMemory;
 	events: FindingsEvents;
 	warnings: string[];
 }
