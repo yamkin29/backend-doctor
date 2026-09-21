@@ -408,3 +408,39 @@ test("filters: a matching glob records the block.call", () => {
 	expect(res.status, res.statusMessage).toBe(0);
 	expect(blockCalls(eventsPath).length).toBeGreaterThanOrEqual(1);
 });
+
+test("memory: periodic samples with well-typed fields; gc events stay structural", () => {
+	const eventsPath = makeEventsPath();
+	const res = spawnHost(path.join(fixturesDir, "mem-app.cjs"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		BACKEND_DOCTOR_PROBE_COLLECTORS: JSON.stringify({
+			blockThresholdMs: 10,
+			lagIntervalMs: 150,
+			n1Threshold: 20,
+		}),
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+	expect(res.stdout).toContain("mem-app-done");
+
+	const events = parseEvents(eventsPath);
+	const samples = events.filter((event) => event.type === "mem.sample");
+	expect(samples.length).toBeGreaterThanOrEqual(2);
+	for (const sample of samples) {
+		for (const key of ["rssMb", "heapUsedMb", "heapTotalMb", "externalMb"]) {
+			expect(typeof sample[key]).toBe("number");
+		}
+	}
+
+	// GCs happen naturally under allocation pressure — pin shapes, not counts.
+	const gcPauses = events.filter((event) => event.type === "gc.pause");
+	for (const pause of gcPauses) {
+		expect(["minor", "major", "incremental", "weakcb", "other"]).toContain(
+			pause.kind,
+		);
+		expect(typeof pause.durationMs).toBe("number");
+	}
+
+	// Ordering: detach still closes the stream; the observer must not keep the
+	// host alive (the fixture exits on its own timer, and we got here).
+	expect(events[events.length - 1]?.type).toBe("probe.detach");
+}, 15000);

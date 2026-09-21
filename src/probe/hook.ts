@@ -11,7 +11,11 @@ import childProcess from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { monitorEventLoopDelay } from "node:perf_hooks";
+import {
+	constants,
+	monitorEventLoopDelay,
+	PerformanceObserver,
+} from "node:perf_hooks";
 import process from "node:process";
 import zlib from "node:zlib";
 import picomatch from "picomatch";
@@ -439,8 +443,82 @@ function installBlockingCollector(settings: CollectorSettings): void {
 }
 
 function installCollectors(settings: CollectorSettings): void {
-	installLagMonitor(settings);
-	installBlockingCollector(settings);
+	// Per-collector isolation (spec 020 AC-7): one collector failing to
+	// install must not take down the others; each notice names its collector.
+	const installs: Array<[string, () => void]> = [
+		["event-loop lag", () => installLagMonitor(settings)],
+		["blocking-call", () => installBlockingCollector(settings)],
+		["memory/gc", () => installMemoryCollector(settings)],
+	];
+	for (const [name, install] of installs) {
+		try {
+			install();
+		} catch (error) {
+			notice(
+				`${name} collector failed to install (${(error as Error).message}); continuing without it`,
+			);
+		}
+	}
+}
+
+// ---- memory/GC collector (spec 020) ----
+
+/**
+ * Periodic memory samples ride their own unref'd interval at the lag cadence
+ * (independent of the lag collector's timer: a bug in one must not silence
+ * the other); each GC the observer sees records a gc.pause event. Verified on
+ * Node 22: the observer holds no event-loop reference — no unref() exists and
+ * none is needed — and the GC kind lives on entry.detail (the legacy entry
+ * .kind accessor is DEP0152).
+ */
+function installMemoryCollector(settings: CollectorSettings): void {
+	const gcKindNames = new Map<number, string>([
+		[constants.NODE_PERFORMANCE_GC_MINOR, "minor"],
+		[constants.NODE_PERFORMANCE_GC_MAJOR, "major"],
+		[constants.NODE_PERFORMANCE_GC_INCREMENTAL, "incremental"],
+		[constants.NODE_PERFORMANCE_GC_WEAKCB, "weakcb"],
+	]);
+	const observer = new PerformanceObserver((list) => {
+		for (const entry of list.getEntries()) {
+			try {
+				// entry.detail exists at runtime (Node 22) but is not on the
+				// @types/node PerformanceEntry — the cast documents the shape.
+				const detail = (entry as unknown as { detail?: { kind?: unknown } })
+					.detail;
+				const kind = gcKindNames.get(Number(detail?.kind ?? -1)) ?? "other";
+				writeEvent({
+					type: "gc.pause",
+					timestamp: new Date().toISOString(),
+					pid: process.pid,
+					kind,
+					durationMs: roundMs(entry.duration),
+				});
+			} catch {
+				// never into the host (§7)
+			}
+		}
+	});
+	observer.observe({ entryTypes: ["gc"] });
+
+	const toMb = (bytes: number): number =>
+		Math.round((bytes / 1048576) * 1000) / 1000;
+	const timer = setInterval(() => {
+		try {
+			const usage = process.memoryUsage();
+			writeEvent({
+				type: "mem.sample",
+				timestamp: new Date().toISOString(),
+				pid: process.pid,
+				rssMb: toMb(usage.rss),
+				heapUsedMb: toMb(usage.heapUsed),
+				heapTotalMb: toMb(usage.heapTotal),
+				externalMb: toMb(usage.external),
+			});
+		} catch {
+			// never into the host (§7)
+		}
+	}, settings.lagIntervalMs);
+	timer.unref();
 }
 
 if (attachFlag.__backendDoctorProbeHook) {
