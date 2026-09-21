@@ -1,6 +1,6 @@
 # Spec 019 — Event loop & blocking attribution (F019)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-21)
 - **Phase:** 5 — Runtime engine
 - **Depends on:** F018 Runtime probe runner (Done — session directory layout,
   `NODE_OPTIONS` hook injection, `events.ndjson` NDJSON discipline,
@@ -381,6 +381,15 @@ blockThresholdMs`:
   existing bin bundle.
 
 ## Open questions for review
+
+All five were resolved on approval (2026-09-21) by adopting the recommendations:
+(1) collector knobs are env vars validated by the parent before spawn (defaults
+`blockThresholdMs: 20`, `lagIntervalMs: 1000`; invalid → exit 2), no new CLI flags;
+(2) attribution via sync-API instrumentation in the preload, sampling profiler
+rejected for this feature; (3) `findings.json` shares the `traceSchemaVersion`
+axis (stays `1`, additive); (4) async_hooks tagging is the bounded
+`asyncId → { type, triggerAsyncId }` map, no per-resource stacks; (5) no new
+dependencies (`picomatch` already a runtime dependency, bundled into the hook).
 
 - **OQ-1 — collector knobs: env vars vs CLI flags vs hardcoded constants.**
   Recommendation: env vars validated by the parent (invalid → exit 2 before
