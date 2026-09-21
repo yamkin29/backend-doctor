@@ -372,3 +372,33 @@ Under interop, a module **without** a default export exposes a *virtual*
   `outExtension: () => ({ js: ".cjs" })` second); `tests/globalSetup.ts`
   iterates the array. The spec 017 note "second entries need no wiring" holds
   only while `buildOptions` stays a single object.
+
+### Probe collectors (spec 019)
+
+- **Core-module monkey-patching in a `--require` preload IS visible to ESM
+  named imports.** Core modules are singletons shared between `require()` and
+  `import()`; a preload patches before user code links, so both caller styles
+  see the wrapper. Verified live on Node 22.13.1 for
+  `import { readFileSync } from "node:fs"` and `import { pbkdf2Sync } from
+  "node:crypto"` — the factual basis for spec 019 AC-4.
+- **"Native" core functions are mostly JS.** `fs.readFileSync` is a JS
+  function from `lib/fs.js`; its `toString()` is source code, not
+  `[native code]` — `toString`-based monkey-patch detection is useless for
+  node core. Observable patch markers must be explicit properties on the
+  wrapper (spec 019 uses a non-enumerable `__backendDoctorProbeWrapped`).
+- **`monitorEventLoopDelay` records nothing until `histogram.enable()`.**
+  Node 22.13.1/macOS: a freshly created IntervalHistogram reports `count` 0,
+  `max` 0 and the constant 511ns floor for every percentile — even under
+  load; after `enable()` (returns `true`) values are sane. Window `count`
+  can still be 0 in live processes (sampling granularity), so assertions on
+  lag data should pin field types, not positivity.
+- **`Error.captureStackTrace(holder, wrapperFn)` crops the wrapper's own
+  frames** (everything above and including the second argument) — the clean
+  way to attribute through a monkey-patch without seeing the patch. The
+  captured stack formats lazily: set `Error.prepareStackTrace` to return the
+  `CallSite[]`, read `holder.stack`, restore — all inside one synchronous
+  block, so a profiler never leaves a global hook patched in the host app.
+- **The repo `"type": "module"` reaches into fixture scripts.** Probe
+  fixtures that use `require()` must be `.cjs` (`spin.cjs`, `blocking.cjs`);
+  a `.js` fixture dies with "require is not defined in ES module scope" —
+  the spec 014 vitest-collection lesson's runtime twin.

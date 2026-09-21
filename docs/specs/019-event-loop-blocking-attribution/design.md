@@ -14,7 +14,7 @@
 | `tests/unit/probe/analysis.test.ts` | NEW: pure findings analysis |
 | `tests/unit/probe/hook.test.ts` | collector integration (built `register.cjs`) |
 | `tests/e2e/probe.test.ts` | CLI-level findings, filters, not-node, invalid knobs, lag windows |
-| `tests/fixtures/probe/blocking.cjs`, `blocking.mjs`, `spin.js` | deliberately blocking fixtures, run by plain `node` |
+| `tests/fixtures/probe/blocking.cjs`, `blocking.mjs`, `spin.cjs` | deliberately blocking fixtures, run by plain `node` |
 
 No build changes: `picomatch` bundles into the existing `register.cjs` hook
 entry automatically (the hook config has no `external`), and the analysis ships

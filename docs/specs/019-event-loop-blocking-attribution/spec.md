@@ -1,6 +1,6 @@
 # Spec 019 — Event loop & blocking attribution (F019)
 
-- **Status:** Approved (2026-09-21)
+- **Status:** Implemented (2026-09-21)
 - **Phase:** 5 — Runtime engine
 - **Depends on:** F018 Runtime probe runner (Done — session directory layout,
   `NODE_OPTIONS` hook injection, `events.ndjson` NDJSON discipline,
@@ -337,18 +337,21 @@ blockThresholdMs`:
   paths — empty, NaN, negative, sub-50 interval (AC-15).
 - **Hook integration — `tests/unit/probe/hook.test.ts`** (extends; built
   `register.cjs` via `spawnSync`, F018 pattern). New fixtures under
-  `tests/fixtures/probe/`, plain `.js`/`.mjs` run by plain `node`:
+  `tests/fixtures/probe/`, run by plain `node` — `require()`-based ones as
+  `.cjs` (the repo package is `"type": "module"`, corrected at close-out):
   - `blocking.cjs` — CJS: `crypto.pbkdf2Sync` (high iterations, reliably slow)
     + a `readFileSync` of a multi-MB file the test pre-creates in the tmp cwd
-    (path via argv).
+    (path via env).
   - `blocking.mjs` — same operations through ESM named imports (AC-4).
-  - `spin.js` — runs ~1.5s with periodic `pbkdf2Sync` bursts (AC-2, e2e lag
+  - `spin.cjs` — runs ~2.5s with periodic `pbkdf2Sync` bursts (AC-2, e2e lag
     windows).
   - Assertions: `block.call` recorded with `api: "crypto.pbkdf2Sync"`,
     culprit file = the fixture, `durationMs` ≥ threshold (knob set low, e.g.
     10) (AC-3); ESM fixture yields the same shape (AC-4); without session env
-    `require("node:fs").readFileSync.toString()` contains `[native code]`,
-    with collectors active it does not (AC-5); final `loop.lag` precedes
+    `require("node:fs").readFileSync` carries no wrapper marker — core
+    functions are JS in `lib/`, so the observable inertness probe is a
+    non-enumerable marker property, not `toString()` (AC-5, corrected at
+    close-out); final `loop.lag` precedes
     `probe.detach`, attach carries `collectors` (AC-1); no event's culprit
     path is under `dist/probe/` or `node:` (AC-6); `BACKEND_DOCTOR_PROBE_FILTERS`
     set to a non-matching glob suppresses `block.call` while lag/lifecycle
@@ -367,11 +370,13 @@ blockThresholdMs`:
   - invalid knob env: exit 2, no session dir, empty stdout (AC-15).
   - `spin.js` with `--duration` and a small interval knob: ≥ 2 non-final
     `loop.lag` windows (AC-2 CLI level).
-- **Existing tests updated (recorded consequence):** the four
-  `expect(events).toHaveLength(2)` pins (three in `hook.test.ts`, one in
-  `probe.test.ts`) become bracket assertions — `probe.attach` first,
-  `probe.detach` last, bracket pids equal — because final `loop.lag` flushes
-  legitimately join the stream. This spec is the recorded justification.
+- **Existing tests updated (recorded consequence):** the e2e pins that
+  assumed a two-line event stream (`toHaveLength(2)` in "runs the app
+  instrumented", `events[1]` in "passes the child exit code") became bracket
+  assertions — `probe.attach` first, `probe.detach` last — because the
+  parent-set collectors legitimately add a final `loop.lag` flush. The unit
+  hook pins stayed green unchanged: those tests run without the collectors
+  env, and lifecycle-only mode is silent.
 - No new rules, no `tests/fixtures/<rule-id>/` trees, no `docs/rules/`
   changes; rule-docs gate untouched. Timing values are excluded from
   assertions except ≥ threshold bounds; long paths keep 30s timeouts (F018
