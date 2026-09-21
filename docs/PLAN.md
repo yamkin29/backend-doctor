@@ -82,7 +82,7 @@ projects[] }`.
 | F018 | Runtime probe runner | 5 | Done |
 | F019 | Event loop & blocking attribution | 5 | Done |
 | F020 | HTTP runtime tracing | 5 | Done |
-| F021 | Combined report (static + runtime) | 5 | Planned |
+| F021 | Combined report (static + runtime) | 5 | Done |
 | — | Engine v2: ParserAdapter → oxc-parser | 5 (in-phase) | Planned |
 | F022 | Eval corpus & precision gate | 6 | Planned |
 | F023 | npm publish & README | 6 | Planned |

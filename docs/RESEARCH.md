@@ -454,3 +454,32 @@ Under interop, a module **without** a default export exposes a *virtual*
   `tests/fixtures/probe/node_modules/@prisma/client/` silently skips a
   plain `git add` and CI fails on a fresh clone — the spec 014 `.env`
   lesson's exact twin; add the directory with `-f`.
+
+### Combined report (spec 021)
+
+- **`block.call` culprit paths are recorded relative to the probe process's
+  cwd when the culprit lives inside it** (`relativeToCwd`,
+  `src/probe/hook.ts`); absolute paths pass through unchanged. Consumers of
+  `findings.json` must therefore resolve relative `file` values against
+  `session.json`'s `session.cwd` — the scan-side `--trace` merge does
+  exactly that, and treats a session without a string `cwd` as not
+  mergeable (exit 2).
+- **findings.json numbers are pre-rounded to 3 decimals at write time**, so
+  a JSON parse + `String(number)` round-trip is exact and deterministic for
+  building message text — no re-rounding needed on the consumer side.
+- **The `Runtime` diagnostic category sat unused in `DIAGNOSTIC_CATEGORIES`
+  from spec 001 until F021** — reserved category values are the extension
+  point for report-level findings that are deliberately *not* registered
+  rules (no config surface, no docs/fixtures obligations under
+  constitution §3). Config keeps rejecting such ids as unknown, which is
+  the documented contract, not an oversight.
+- **Never mutate shared `dist/` artifacts inside a test.** The spec 018 e2e
+  "missing hook preload" test renamed `dist/probe/register.cjs` to
+  `.hidden` for its duration and restored it afterwards — a ~200 ms window
+  in which every *other* parallel vitest worker spawning the hook (e2e
+  probes, hook integration children) fails with `Cannot find module` or
+  "probe hook not found". The race was latent since F018 (tiny window,
+  few spawning tests) and started firing almost every full-suite run once
+  F021 added three more process-spawning e2e files. Fix pattern: preflight
+  logic lives in a unit-testable function (`hookPreflightError`); tests
+  never hide shared build artifacts — point them at temp paths instead.

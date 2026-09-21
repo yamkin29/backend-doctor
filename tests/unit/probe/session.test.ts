@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { expect, test } from "vitest";
+import { hookPreflightError } from "../../../src/probe/runner.js";
 import {
 	buildSessionDoc,
 	createSessionDir,
@@ -13,6 +14,23 @@ import { TRACE_SCHEMA_VERSION } from "../../../src/probe/types.js";
 function makeTmpDir(): string {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "bd-session-"));
 }
+
+// Spec 018 AC-10 (missing hook preload), unit level since the spec 021
+// deviation: the former e2e hid the shared dist artifact, racing every
+// parallel worker that spawns the hook.
+test("hook preflight accepts an existing hook file", () => {
+	const dir = makeTmpDir();
+	const hookPath = path.join(dir, "register.cjs");
+	fs.writeFileSync(hookPath, "module.exports = {};");
+	expect(hookPreflightError(hookPath)).toBeNull();
+});
+
+test("hook preflight rejects a missing hook file with the usage reason", () => {
+	const hookPath = path.join(makeTmpDir(), "register.cjs");
+	expect(hookPreflightError(hookPath)).toBe(
+		`probe hook not found in this installation: ${hookPath}`,
+	);
+});
 
 test("utcStamp is UTC compact form", () => {
 	expect(utcStamp(new Date("2026-09-21T10:15:30.123Z"))).toBe(

@@ -1,6 +1,6 @@
 # Spec 021 — Combined report (static + runtime) (F021)
 
-- **Status:** Approved (2026-09-21)
+- **Status:** Implemented (2026-09-21)
 - **Phase:** 5 — Runtime engine
 - **Depends on:** F018 Runtime probe runner (Done — the session directory and
   `findings.json` exist as a versioned contract), F019 Event loop & blocking

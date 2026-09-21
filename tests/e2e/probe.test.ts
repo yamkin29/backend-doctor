@@ -324,26 +324,6 @@ test(
 );
 
 test(
-	"missing hook preload: exit 2 and no session directory",
-	async () => {
-		const cwd = tmpCwd();
-		const hookPath = path.join(repoRoot, "dist/probe/register.cjs");
-		const hiddenPath = `${hookPath}.hidden`;
-		fs.renameSync(hookPath, hiddenPath);
-		try {
-			await assertUsageError(
-				["probe", "--", "node", fixture("ok.js")],
-				cwd,
-				"probe hook not found",
-			);
-		} finally {
-			fs.renameSync(hiddenPath, hookPath);
-		}
-	},
-	{ timeout: 30000 },
-);
-
-test(
 	"descendant node processes attach with their own pid (NODE_OPTIONS inheritance)",
 	async () => {
 		const cwd = tmpCwd();

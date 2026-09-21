@@ -31,6 +31,20 @@ export function probeHookPath(): string {
 	);
 }
 
+/**
+ * Spec 018 AC-10 preflight: the usage-error reason when the installation's
+ * hook preload is missing, or null when the run may start. Extracted from
+ * runProbe so the missing-hook red path is testable without hiding the
+ * shared dist artifact (which races every parallel worker that spawns the
+ * hook — the spec 021 deviation).
+ */
+export function hookPreflightError(hookPath: string): string | null {
+	if (!fs.existsSync(hookPath)) {
+		return `probe hook not found in this installation: ${hookPath}`;
+	}
+	return null;
+}
+
 function warningText(sessionDir: string): string {
 	return (
 		`backend-doctor probe: this session records runtime data that may include URLs, file paths and other request data.\n` +
@@ -102,10 +116,9 @@ export function runProbe(input: {
 	const args = parsed.command.slice(1);
 
 	const hookPath = probeHookPath();
-	if (!fs.existsSync(hookPath)) {
-		process.stderr.write(
-			`probe hook not found in this installation: ${hookPath}\n`,
-		);
+	const hookError = hookPreflightError(hookPath);
+	if (hookError !== null) {
+		process.stderr.write(`${hookError}\n`);
 		return Promise.resolve(2);
 	}
 
