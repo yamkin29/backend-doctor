@@ -67,6 +67,10 @@ export async function run(argv: string[]): Promise<number> {
 			collectRepeatable,
 			[],
 		)
+		.option(
+			"--trace <dir>",
+			"merge runtime findings from a probe session directory (spec 021)",
+		)
 		.option("--config <path>", "load exactly this config file, skip discovery")
 		.option(
 			"--dump-config",
