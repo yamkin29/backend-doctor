@@ -26,6 +26,7 @@ interface ProbeEvent {
 interface CollectorSettings {
 	blockThresholdMs: number;
 	lagIntervalMs: number;
+	n1Threshold: number;
 }
 
 const NOTICE_PREFIX = "backend-doctor probe:";
@@ -95,12 +96,16 @@ function parseCollectors(raw: string | undefined): {
 			value.blockThresholdMs > 0 &&
 			typeof value.lagIntervalMs === "number" &&
 			Number.isFinite(value.lagIntervalMs) &&
-			value.lagIntervalMs >= MIN_LAG_INTERVAL_MS
+			value.lagIntervalMs >= MIN_LAG_INTERVAL_MS &&
+			typeof value.n1Threshold === "number" &&
+			Number.isFinite(value.n1Threshold) &&
+			value.n1Threshold > 0
 		) {
 			return {
 				settings: {
 					blockThresholdMs: value.blockThresholdMs,
 					lagIntervalMs: value.lagIntervalMs,
+					n1Threshold: value.n1Threshold,
 				},
 				malformed: false,
 			};

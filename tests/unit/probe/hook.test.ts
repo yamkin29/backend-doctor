@@ -45,6 +45,7 @@ function makeEventsPath(): string {
 const COLLECTORS = JSON.stringify({
 	blockThresholdMs: 10,
 	lagIntervalMs: 1000,
+	n1Threshold: 20,
 });
 
 function parseEvents(filePath: string): Array<Record<string, unknown>> {
@@ -162,6 +163,7 @@ test("collectors: attach carries the block, final lag flush precedes detach", ()
 	expect(attach?.collectors).toEqual({
 		blockThresholdMs: 10,
 		lagIntervalMs: 1000,
+		n1Threshold: 20,
 	});
 	expect(last?.type).toBe("probe.detach");
 
@@ -195,6 +197,7 @@ test(
 			BACKEND_DOCTOR_PROBE_COLLECTORS: JSON.stringify({
 				blockThresholdMs: 10,
 				lagIntervalMs: 300,
+				n1Threshold: 20,
 			}),
 		});
 		expect(res.status, res.statusMessage).toBe(0);
@@ -237,6 +240,27 @@ test("malformed collectors JSON: one notice, lifecycle-only", () => {
 	expect(events[0]?.collectors).toBeUndefined();
 });
 
+test("invalid n1 threshold inside collectors: one notice, lifecycle-only", () => {
+	const eventsPath = makeEventsPath();
+	const res = spawnHost(path.join(fixturesDir, "ok.js"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		BACKEND_DOCTOR_PROBE_COLLECTORS: JSON.stringify({
+			blockThresholdMs: 10,
+			lagIntervalMs: 1000,
+			n1Threshold: 0,
+		}),
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+	expect(res.stderr).toContain("collectors");
+
+	const events = parseEvents(eventsPath);
+	expect(events.map((event) => event.type)).toEqual([
+		"probe.attach",
+		"probe.detach",
+	]);
+	expect(events[0]?.collectors).toBeUndefined();
+});
+
 function makeBigFile(): string {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bd-block-"));
 	const target = path.join(dir, "big.bin");
@@ -257,6 +281,7 @@ test("blocking: slow sync calls are attributed to the fixture", () => {
 		BACKEND_DOCTOR_PROBE_COLLECTORS: JSON.stringify({
 			blockThresholdMs: 1,
 			lagIntervalMs: 1000,
+			n1Threshold: 20,
 		}),
 		BLOCK_TARGET: target,
 	});
@@ -359,6 +384,7 @@ test("filters: non-matching block.call suppressed, lag and lifecycle kept", () =
 		BACKEND_DOCTOR_PROBE_COLLECTORS: JSON.stringify({
 			blockThresholdMs: 1,
 			lagIntervalMs: 1000,
+			n1Threshold: 20,
 		}),
 		BACKEND_DOCTOR_PROBE_FILTERS: JSON.stringify(["vendor/**"]),
 		BLOCK_TARGET: target,
