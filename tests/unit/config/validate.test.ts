@@ -94,4 +94,23 @@ describe("validateUserConfig", () => {
 	it("rejects non-object ignore", () => {
 		expect(() => validate({ ignore: ["dist/**"] })).toThrow(/ignore/);
 	});
+
+	// Spec 021 AC-15: runtime findings carry report-level rule-id strings that
+	// are deliberately NOT registered rules, so the registry-backed known-id
+	// set scan validates against never contains them and config keeps
+	// rejecting them.
+	it("rejects runtime finding ids in rules and ignore.rules", () => {
+		const registered = new Set(["backend-doctor/no-eval"]);
+		for (const id of [
+			"backend-doctor/runtime-blocking-call",
+			"backend-doctor/runtime-possible-n1",
+		]) {
+			expect(() => validate({ rules: { [id]: "error" } }, registered)).toThrow(
+				/unknown rule id/,
+			);
+			expect(() => validate({ ignore: { rules: [id] } }, registered)).toThrow(
+				/unknown rule id/,
+			);
+		}
+	});
 });
