@@ -120,6 +120,10 @@ function parseCollectors(raw: string | undefined): {
 function installLagMonitor(settings: CollectorSettings): void {
 	const windowHist = monitorEventLoopDelay({ resolution: 10 });
 	const totalHist = monitorEventLoopDelay({ resolution: 10 });
+	// Empirical (Node 22): without an explicit enable() the histograms record
+	// nothing — count stays 0 and every percentile returns the floor bucket.
+	windowHist.enable();
+	totalHist.enable();
 	const totalSnapshot = () => ({
 		count: totalHist.count,
 		p50Ms: msRound(totalHist.percentile(50)),

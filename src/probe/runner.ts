@@ -4,8 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { buildFindings } from "./analysis.js";
 import { buildNodeOptions } from "./node-options.js";
-import type { ParsedProbeOptions } from "./options.js";
+import type { ParsedProbeOptions, ProbeCollectors } from "./options.js";
 import {
 	buildSessionDoc,
 	createSessionDir,
@@ -13,6 +14,7 @@ import {
 } from "./session.js";
 import type { ProbeExit } from "./types.js";
 
+const NOTICE_PREFIX = "backend-doctor probe:";
 const EVENT_ENV = "BACKEND_DOCTOR_PROBE_EVENTS";
 const COLLECTORS_ENV = "BACKEND_DOCTOR_PROBE_COLLECTORS";
 const FILTERS_ENV = "BACKEND_DOCTOR_PROBE_FILTERS";
@@ -39,6 +41,45 @@ function warningText(sessionDir: string): string {
 function signalExitCode(signal: string): number {
 	const number_ = (os.constants.signals as Record<string, number>)[signal];
 	return 128 + (number_ ?? 0);
+}
+
+function round1(value: number): number {
+	return Math.round(value * 10) / 10;
+}
+
+/**
+ * Reads the recorded events, derives the versioned findings document (pure,
+ * deterministic for a given events file), writes findings.json next to the
+ * session files, and prints one stderr summary line. Findings never change
+ * the probe's exit code: an analysis failure is loud on stderr only.
+ */
+function finalizeFindings(
+	eventsPath: string,
+	sessionDir: string,
+	sessionId: string,
+	collectors: ProbeCollectors,
+): void {
+	const findingsPath = path.join(sessionDir, "findings.json");
+	try {
+		const findings = buildFindings({
+			sessionId,
+			collectors,
+			eventsText: fs.readFileSync(eventsPath, "utf8"),
+		});
+		fs.writeFileSync(findingsPath, `${JSON.stringify(findings, null, "\t")}\n`);
+		for (const warning of findings.warnings) {
+			process.stderr.write(`${NOTICE_PREFIX} ${warning}\n`);
+		}
+		process.stderr.write(
+			`${NOTICE_PREFIX} findings written to ${findingsPath} — ` +
+				`${findings.blocking.count} blocking call(s) >= ${collectors.blockThresholdMs}ms ` +
+				`(total ${round1(findings.blocking.totalMs)}ms), lag p99 ${round1(findings.loopLag.p99Ms)}ms\n`,
+		);
+	} catch (error) {
+		process.stderr.write(
+			`${NOTICE_PREFIX} findings finalization failed: ${(error as Error).message}\n`,
+		);
+	}
 }
 
 /**
@@ -153,6 +194,12 @@ export function runProbe(input: {
 				exit,
 			});
 			writeSessionDoc(session.dir, doc);
+			finalizeFindings(
+				session.eventsPath,
+				session.dir,
+				session.id,
+				parsed.collectors,
+			);
 			process.stderr.write(
 				`backend-doctor probe: trace written to ${session.dir}\n`,
 			);

@@ -370,3 +370,198 @@ test(
 	},
 	{ timeout: 30000 },
 );
+
+interface FindingsJson {
+	traceSchemaVersion: number;
+	sessionId: string;
+	collectors: { blockThresholdMs: number; lagIntervalMs: number };
+	loopLag: {
+		windows: number;
+		count: number;
+		p50Ms: number;
+		p99Ms: number;
+		maxMs: number;
+	};
+	blocking: {
+		count: number;
+		totalMs: number;
+		calls: Array<{
+			api: string;
+			count: number;
+			totalMs: number;
+			maxMs: number;
+			file: string;
+			line: number | null;
+			column: number | null;
+			function: string | null;
+			asyncRootType: string;
+		}>;
+	};
+	events: { lines: number; malformedLines: number; attachProcesses: number };
+	warnings: string[];
+}
+
+function readFindings(sessionDir: string): FindingsJson {
+	return JSON.parse(
+		fs.readFileSync(path.join(sessionDir, "findings.json"), "utf8"),
+	);
+}
+
+test(
+	"probe writes findings.json and a stderr summary for a blocking app",
+	async () => {
+		const cwd = tmpCwd();
+		// Run the fixture from the target cwd so the culprit path is recorded
+		// relative (the form findings.json is meant to be read in).
+		fs.copyFileSync(fixture("blocking.cjs"), path.join(cwd, "blocking.cjs"));
+		const result = await runCliAsync(["probe", "--", "node", "blocking.cjs"], {
+			cwd,
+			env: { BACKEND_DOCTOR_PROBE_BLOCK_THRESHOLD_MS: "1" },
+		});
+		expect(result.exitCode, result.stderr).toBe(0);
+		expect(result.stdout).toBe("blocking-done 32\n");
+
+		const sessionDir = soleSessionDir(cwd);
+		assertCommonSession(sessionDir, cwd, ["node", "blocking.cjs"]);
+		const findings = readFindings(sessionDir);
+		expect(Object.keys(findings)).toEqual([
+			"traceSchemaVersion",
+			"sessionId",
+			"collectors",
+			"loopLag",
+			"blocking",
+			"events",
+			"warnings",
+		]);
+		expect(findings.traceSchemaVersion).toBe(1);
+		expect(findings.sessionId).toBe(path.basename(sessionDir));
+		expect(findings.collectors).toEqual({
+			blockThresholdMs: 1,
+			lagIntervalMs: 1000,
+		});
+		expect(findings.blocking.count).toBeGreaterThanOrEqual(1);
+		expect(findings.blocking.calls[0]?.file).toBe("blocking.cjs");
+		expect(findings.blocking.calls[0]?.api).toBe("crypto.pbkdf2Sync");
+		expect(findings.blocking.calls[0]?.totalMs).toBeGreaterThanOrEqual(1);
+		expect(findings.events.attachProcesses).toBe(1);
+		expect(findings.warnings).toEqual([]);
+
+		expect(result.stderr).toContain("findings.json");
+		expect(result.stderr).toContain("blocking call");
+	},
+	{ timeout: 30000 },
+);
+
+test(
+	"probe --filter drives findings at the CLI level",
+	async () => {
+		const excluded = tmpCwd();
+		fs.copyFileSync(
+			fixture("blocking.cjs"),
+			path.join(excluded, "blocking.cjs"),
+		);
+		const excludedResult = await runCliAsync(
+			["probe", "--filter", "vendor/**", "--", "node", "blocking.cjs"],
+			{ cwd: excluded, env: { BACKEND_DOCTOR_PROBE_BLOCK_THRESHOLD_MS: "1" } },
+		);
+		expect(excludedResult.exitCode, excludedResult.stderr).toBe(0);
+		const excludedFindings = readFindings(soleSessionDir(excluded));
+		expect(excludedFindings.blocking.count).toBe(0);
+		expect(excludedFindings.blocking.calls).toEqual([]);
+
+		const included = tmpCwd();
+		fs.copyFileSync(
+			fixture("blocking.cjs"),
+			path.join(included, "blocking.cjs"),
+		);
+		const includedResult = await runCliAsync(
+			["probe", "--filter", "**/blocking.cjs", "--", "node", "blocking.cjs"],
+			{ cwd: included, env: { BACKEND_DOCTOR_PROBE_BLOCK_THRESHOLD_MS: "1" } },
+		);
+		expect(includedResult.exitCode, includedResult.stderr).toBe(0);
+		const includedFindings = readFindings(soleSessionDir(included));
+		expect(includedFindings.blocking.count).toBeGreaterThanOrEqual(1);
+	},
+	{ timeout: 30000 },
+);
+
+test(
+	"probe finalizes a zero-state findings.json when the target is not Node",
+	async () => {
+		const cwd = tmpCwd();
+		const result = await runCliAsync(
+			["probe", "--", "sh", "-c", "echo not-node"],
+			{
+				cwd,
+			},
+		);
+		expect(result.exitCode, result.stderr).toBe(0);
+		expect(result.stdout).toBe("not-node\n");
+
+		const findings = readFindings(soleSessionDir(cwd));
+		expect(findings.blocking).toEqual({ count: 0, totalMs: 0, calls: [] });
+		expect(findings.loopLag).toEqual({
+			windows: 0,
+			count: 0,
+			p50Ms: 0,
+			p99Ms: 0,
+			maxMs: 0,
+		});
+		expect(findings.events.attachProcesses).toBe(0);
+		expect(findings.warnings).toContain(
+			"no probe events recorded — the target may not be Node or the hook did not load",
+		);
+		expect(result.stderr).toContain("no probe events recorded");
+	},
+	{ timeout: 30000 },
+);
+
+test(
+	"invalid collector knobs are usage errors before spawn",
+	async () => {
+		const badThreshold = tmpCwd();
+		const thresholdResult = await runCliAsync(
+			["probe", "--", "node", fixture("ok.js")],
+			{
+				cwd: badThreshold,
+				env: { BACKEND_DOCTOR_PROBE_BLOCK_THRESHOLD_MS: "abc" },
+			},
+		);
+		expect(thresholdResult.exitCode).toBe(2);
+		expect(thresholdResult.stdout).toBe("");
+		expect(thresholdResult.stderr).toContain(
+			"BACKEND_DOCTOR_PROBE_BLOCK_THRESHOLD_MS",
+		);
+		expect(fs.existsSync(probeStorageRoot(badThreshold))).toBe(false);
+
+		const badInterval = tmpCwd();
+		const intervalResult = await runCliAsync(
+			["probe", "--", "node", fixture("ok.js")],
+			{ cwd: badInterval, env: { BACKEND_DOCTOR_PROBE_LAG_INTERVAL_MS: "10" } },
+		);
+		expect(intervalResult.exitCode).toBe(2);
+		expect(intervalResult.stdout).toBe("");
+		expect(intervalResult.stderr).toContain(
+			"BACKEND_DOCTOR_PROBE_LAG_INTERVAL_MS",
+		);
+		expect(fs.existsSync(probeStorageRoot(badInterval))).toBe(false);
+	},
+	{ timeout: 30000 },
+);
+
+test(
+	"lag windows are recorded in bounded sessions",
+	async () => {
+		const cwd = tmpCwd();
+		const result = await runCliAsync(
+			["probe", "--duration", "2", "--", "node", fixture("spin.cjs")],
+			{ cwd, env: { BACKEND_DOCTOR_PROBE_LAG_INTERVAL_MS: "100" } },
+		);
+		expect(result.exitCode, result.stderr).toBe(130);
+
+		const findings = readFindings(soleSessionDir(cwd));
+		expect(findings.loopLag.windows).toBeGreaterThanOrEqual(2);
+		expect(findings.loopLag.count).toBeGreaterThan(0);
+	},
+	{ timeout: 30000 },
+);
