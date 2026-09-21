@@ -24,6 +24,12 @@ export function renderPretty(doc: ReportDocument): string {
 		lines.push(`Frameworks: ${frameworks.join(", ")}`);
 	}
 
+	// One additive line, only when a probe session was merged (spec 021) —
+	// runtime-free reports stay byte-identical to the pre-021 output.
+	if (doc.runtime) {
+		lines.push(`Runtime trace: ${doc.runtime.sessionDir}`);
+	}
+
 	const errors = doc.diagnostics.filter((d) => d.severity === "error").length;
 	const warnings = doc.diagnostics.length - errors;
 
