@@ -438,6 +438,7 @@ test(
 		expect(findings.collectors).toEqual({
 			blockThresholdMs: 1,
 			lagIntervalMs: 1000,
+			n1Threshold: 20,
 		});
 		expect(findings.blocking.count).toBeGreaterThanOrEqual(1);
 		expect(findings.blocking.calls[0]?.file).toBe("blocking.cjs");

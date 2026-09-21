@@ -25,6 +25,7 @@ export async function probeCommand(
 		filter: opts.filter,
 		blockThresholdMs: process.env.BACKEND_DOCTOR_PROBE_BLOCK_THRESHOLD_MS,
 		lagIntervalMs: process.env.BACKEND_DOCTOR_PROBE_LAG_INTERVAL_MS,
+		n1Threshold: process.env.BACKEND_DOCTOR_PROBE_N1_THRESHOLD,
 	});
 	if (!parsed.ok) {
 		process.stderr.write(`${parsed.error}\n`);

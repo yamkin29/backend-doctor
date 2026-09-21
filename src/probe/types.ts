@@ -10,10 +10,12 @@ export const TRACE_SCHEMA_VERSION = 1;
 /** How the target process ended: a normal exit code or a killing signal. */
 export type ProbeExit = { code: number } | { signal: string };
 
-/** Collector settings carried by probe.attach events and findings.json (spec 019). */
+/** Collector settings carried by probe.attach events and findings.json (specs 019/020). */
 export interface ProbeCollectorsSettings {
 	blockThresholdMs: number;
 	lagIntervalMs: number;
+	/** Per-request db-query count that triggers the N+1 warning (spec 020). */
+	n1Threshold: number;
 }
 
 /** Async-context tag on a blocking call: executing resource + trigger-chain root (spec 019). */

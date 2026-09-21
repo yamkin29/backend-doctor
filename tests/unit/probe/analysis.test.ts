@@ -5,6 +5,7 @@ import type { ProbeCollectors } from "../../../src/probe/options.js";
 const collectors: ProbeCollectors = {
 	blockThresholdMs: 20,
 	lagIntervalMs: 1000,
+	n1Threshold: 20,
 };
 
 function eventsText(...events: Array<Record<string, unknown>>): string {

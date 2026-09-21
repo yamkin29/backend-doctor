@@ -13,6 +13,7 @@ export type ProbeCollectors = ProbeCollectorsSettings;
 
 export const DEFAULT_BLOCK_THRESHOLD_MS = 20;
 export const DEFAULT_LAG_INTERVAL_MS = 1000;
+export const DEFAULT_N1_THRESHOLD = 20;
 export const MIN_LAG_INTERVAL_MS = 50;
 
 export interface ProbeOptionsInput {
@@ -28,6 +29,8 @@ export interface ProbeOptionsInput {
 	blockThresholdMs?: string;
 	/** Raw `BACKEND_DOCTOR_PROBE_LAG_INTERVAL_MS` env value. */
 	lagIntervalMs?: string;
+	/** Raw `BACKEND_DOCTOR_PROBE_N1_THRESHOLD` env value (spec 020). */
+	n1Threshold?: string;
 }
 
 export interface ParsedProbeOptions {
@@ -69,6 +72,20 @@ function parseFloorMs(
 		};
 	}
 	return { ok: true, ms: parsed };
+}
+
+function parsePositiveCount(
+	raw: string,
+	envName: string,
+): { ok: true; count: number } | { ok: false; error: string } {
+	const parsed = Number(raw);
+	if (!Number.isFinite(parsed) || parsed <= 0) {
+		return {
+			ok: false,
+			error: `${envName} must be a positive number, got ${JSON.stringify(raw)}`,
+		};
+	}
+	return { ok: true, count: parsed };
 }
 
 export function parseProbeOptions(input: ProbeOptionsInput): ParseProbeResult {
@@ -123,6 +140,18 @@ export function parseProbeOptions(input: ProbeOptionsInput): ParseProbeResult {
 		lagIntervalMs = knob.ms;
 	}
 
+	let n1Threshold = DEFAULT_N1_THRESHOLD;
+	if (input.n1Threshold !== undefined) {
+		const knob = parsePositiveCount(
+			input.n1Threshold,
+			"BACKEND_DOCTOR_PROBE_N1_THRESHOLD",
+		);
+		if (!knob.ok) {
+			return { ok: false, error: knob.error };
+		}
+		n1Threshold = knob.count;
+	}
+
 	return {
 		ok: true,
 		value: {
@@ -130,7 +159,7 @@ export function parseProbeOptions(input: ProbeOptionsInput): ParseProbeResult {
 			durationSeconds,
 			outDir: input.out ?? null,
 			filters: [...input.filter],
-			collectors: { blockThresholdMs, lagIntervalMs },
+			collectors: { blockThresholdMs, lagIntervalMs, n1Threshold },
 		},
 	};
 }

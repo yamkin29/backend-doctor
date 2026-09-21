@@ -9,6 +9,7 @@ function parse(overrides: {
 	filter?: string[];
 	blockThresholdMs?: string;
 	lagIntervalMs?: string;
+	n1Threshold?: string;
 }) {
 	return parseProbeOptions({
 		command: ["node", "server.js"],
@@ -70,24 +71,47 @@ test("empty filter glob is a usage error", () => {
 	expect(result.error).toContain("--filter");
 });
 
-test("collector knobs default to 20ms threshold and 1000ms interval", () => {
+test("collector knobs default to 20ms threshold, 1000ms interval, n1 threshold 20", () => {
 	const result = parse({});
 	expect(result.ok).toBe(true);
 	if (!result.ok) return;
 	expect(result.value.collectors).toEqual({
 		blockThresholdMs: 20,
 		lagIntervalMs: 1000,
+		n1Threshold: 20,
 	});
 });
 
 test("valid collector knobs parse into numbers", () => {
-	const result = parse({ blockThresholdMs: "5", lagIntervalMs: "250" });
+	const result = parse({
+		blockThresholdMs: "5",
+		lagIntervalMs: "250",
+		n1Threshold: "35",
+	});
 	expect(result.ok).toBe(true);
 	if (!result.ok) return;
 	expect(result.value.collectors).toEqual({
 		blockThresholdMs: 5,
 		lagIntervalMs: 250,
+		n1Threshold: 35,
 	});
+});
+
+test("fractional n1 threshold knob parses", () => {
+	const result = parse({ n1Threshold: "2.5" });
+	expect(result.ok).toBe(true);
+	if (!result.ok) return;
+	expect(result.value.collectors.n1Threshold).toBe(2.5);
+});
+
+test("invalid n1 threshold is a usage error naming the env var", () => {
+	for (const raw of ["abc", "", "0", "-1", "Infinity"]) {
+		const result = parse({ n1Threshold: raw });
+		expect(result.ok, `n1 threshold ${JSON.stringify(raw)}`).toBe(false);
+		if (result.ok) return;
+		expect(result.error).toContain("BACKEND_DOCTOR_PROBE_N1_THRESHOLD");
+		expect(result.error).toContain(JSON.stringify(raw));
+	}
 });
 
 test("invalid block threshold is a usage error naming the env var", () => {
@@ -117,6 +141,7 @@ test("lag interval at the 50ms floor is valid; fractional knobs parse", () => {
 	expect(result.value.collectors).toEqual({
 		blockThresholdMs: 1.5,
 		lagIntervalMs: 50,
+		n1Threshold: 20,
 	});
 });
 
