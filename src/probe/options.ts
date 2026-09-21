@@ -6,11 +6,10 @@
  * validates them before spawn so garbage is a loud usage error, not a silent
  * default.
  */
+import type { ProbeCollectorsSettings } from "./types.js";
 
-export interface ProbeCollectors {
-	blockThresholdMs: number;
-	lagIntervalMs: number;
-}
+/** The parsed collector knobs; shape is the trace contract's settings block. */
+export type ProbeCollectors = ProbeCollectorsSettings;
 
 export const DEFAULT_BLOCK_THRESHOLD_MS = 20;
 export const DEFAULT_LAG_INTERVAL_MS = 1000;

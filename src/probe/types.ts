@@ -10,6 +10,18 @@ export const TRACE_SCHEMA_VERSION = 1;
 /** How the target process ended: a normal exit code or a killing signal. */
 export type ProbeExit = { code: number } | { signal: string };
 
+/** Collector settings carried by probe.attach events and findings.json (spec 019). */
+export interface ProbeCollectorsSettings {
+	blockThresholdMs: number;
+	lagIntervalMs: number;
+}
+
+/** Async-context tag on a blocking call: executing resource + trigger-chain root (spec 019). */
+export interface ProbeAsyncTag {
+	type: string;
+	rootType: string;
+}
+
 export interface ProbeNodeInfo {
 	version: string;
 	platform: string;
@@ -44,6 +56,8 @@ export interface ProbeAttachEvent {
 	ppid: number;
 	nodeVersion: string;
 	argv: string[];
+	/** Present when the collectors are active in that process (spec 019). */
+	collectors?: ProbeCollectorsSettings;
 }
 
 export interface ProbeDetachEvent {
@@ -52,4 +66,84 @@ export interface ProbeDetachEvent {
 	pid: number;
 	reason: "exit";
 	code: number;
+}
+
+/** One slow synchronous call attributed to a source location (spec 019). */
+export interface ProbeBlockCallEvent {
+	type: "block.call";
+	timestamp: string;
+	pid: number;
+	api: string;
+	durationMs: number;
+	file: string;
+	line: number | null;
+	column: number | null;
+	function: string | null;
+	async?: ProbeAsyncTag;
+}
+
+/** Cumulative-histogram summary carried by every loop.lag event (spec 019). */
+export interface ProbeLoopLagTotal {
+	count: number;
+	p50Ms: number;
+	p99Ms: number;
+	maxMs: number;
+}
+
+/** One event-loop lag window, or the final cumulative flush (spec 019). */
+export interface ProbeLoopLagEvent {
+	type: "loop.lag";
+	timestamp: string;
+	pid: number;
+	periodMs: number;
+	count: number;
+	p50Ms: number;
+	p99Ms: number;
+	maxMs: number;
+	final: boolean;
+	total: ProbeLoopLagTotal;
+}
+
+/** One aggregated blocking site in findings.json (spec 019). */
+export interface FindingsCall {
+	api: string;
+	count: number;
+	totalMs: number;
+	maxMs: number;
+	file: string;
+	line: number | null;
+	column: number | null;
+	function: string | null;
+	asyncRootType: string;
+}
+
+export interface FindingsLoopLag {
+	windows: number;
+	count: number;
+	p50Ms: number;
+	p99Ms: number;
+	maxMs: number;
+}
+
+export interface FindingsBlocking {
+	count: number;
+	totalMs: number;
+	calls: FindingsCall[];
+}
+
+export interface FindingsEvents {
+	lines: number;
+	malformedLines: number;
+	attachProcesses: number;
+}
+
+/** The `findings.json` document written at finalize (spec 019). */
+export interface FindingsDocument {
+	traceSchemaVersion: typeof TRACE_SCHEMA_VERSION;
+	sessionId: string;
+	collectors: ProbeCollectorsSettings;
+	loopLag: FindingsLoopLag;
+	blocking: FindingsBlocking;
+	events: FindingsEvents;
+	warnings: string[];
 }
