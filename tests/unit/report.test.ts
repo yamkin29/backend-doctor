@@ -91,6 +91,71 @@ describe("buildReport — scope (spec 015)", () => {
 	});
 });
 
+describe("buildReport — runtime provenance (spec 021)", () => {
+	const provenance = {
+		sessionDir: "/repo/.backend-doctor/probe/s1",
+		traceSchemaVersion: 1 as const,
+	};
+
+	it("appends the runtime block as the document's last key", () => {
+		const doc = buildReport(resultWith([]), provenance);
+		expect(doc.runtime).toEqual(provenance);
+		expect(Object.keys(doc)).toEqual([
+			"schemaVersion",
+			"mode",
+			"directory",
+			"diagnostics",
+			"projects",
+			"runtime",
+		]);
+	});
+
+	it("keeps the runtime block after an optional scope block", () => {
+		const doc = buildReport(
+			scopedResultWith(scopeWithMode("changed", "main")),
+			provenance,
+		);
+		expect(Object.keys(doc)).toEqual([
+			"schemaVersion",
+			"mode",
+			"scope",
+			"directory",
+			"diagnostics",
+			"projects",
+			"runtime",
+		]);
+	});
+
+	it("omits the key entirely without a trace", () => {
+		const doc = buildReport(resultWith([]));
+		expect(Object.keys(doc)).not.toContain("runtime");
+	});
+});
+
+describe("exitCodeFor — with runtime diagnostics (spec 021 AC-11)", () => {
+	const runtimeWarn: Diagnostic = {
+		id: "rt1",
+		filePath: "/repo/src/a.ts",
+		line: 42,
+		column: 7,
+		rule: "backend-doctor/runtime-blocking-call",
+		category: "Runtime",
+		severity: "warn",
+		message: "readFileSync blocked the event loop",
+		tags: ["runtime"],
+	};
+
+	it("returns 0 for a warn-only report containing runtime diagnostics", () => {
+		expect(exitCodeFor(buildReport(resultWith([runtimeWarn])))).toBe(0);
+	});
+
+	it("still returns 1 when a static error accompanies runtime diagnostics", () => {
+		expect(
+			exitCodeFor(buildReport(resultWith([runtimeWarn, errorDiagnostic]))),
+		).toBe(1);
+	});
+});
+
 describe("exitCodeFor", () => {
 	it("returns 0 when there are no diagnostics", () => {
 		expect(exitCodeFor(buildReport(resultWith([])))).toBe(0);
