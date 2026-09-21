@@ -15,6 +15,7 @@ import type { ProbeExit } from "./types.js";
 
 const EVENT_ENV = "BACKEND_DOCTOR_PROBE_EVENTS";
 const COLLECTORS_ENV = "BACKEND_DOCTOR_PROBE_COLLECTORS";
+const FILTERS_ENV = "BACKEND_DOCTOR_PROBE_FILTERS";
 const ESCALATION_STEP_MS = 5000;
 
 /**
@@ -85,6 +86,9 @@ export function runProbe(input: {
 	// Collector settings (spec 019): validated knobs, re-exported in the
 	// normalized shape the hook expects — the child never parses raw knobs.
 	env[COLLECTORS_ENV] = JSON.stringify(parsed.collectors);
+	if (parsed.filters.length > 0) {
+		env[FILTERS_ENV] = JSON.stringify(parsed.filters);
+	}
 
 	const startedAtMs = Date.now();
 	const child = spawn(command, args, {

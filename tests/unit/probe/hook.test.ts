@@ -350,3 +350,35 @@ test("blocking: never attributes the hook bundle or node internals", () => {
 		).toBe(true);
 	}
 });
+
+test("filters: non-matching block.call suppressed, lag and lifecycle kept", () => {
+	const eventsPath = makeEventsPath();
+	const target = makeBigFile();
+	const res = spawnHost(path.join(fixturesDir, "blocking.cjs"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		BACKEND_DOCTOR_PROBE_COLLECTORS: JSON.stringify({
+			blockThresholdMs: 1,
+			lagIntervalMs: 1000,
+		}),
+		BACKEND_DOCTOR_PROBE_FILTERS: JSON.stringify(["vendor/**"]),
+		BLOCK_TARGET: target,
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+	expect(blockCalls(eventsPath)).toHaveLength(0);
+
+	const types = parseEvents(eventsPath).map((event) => event.type);
+	expect(types).toContain("probe.attach");
+	expect(types).toContain("loop.lag");
+	expect(types).toContain("probe.detach");
+});
+
+test("filters: a matching glob records the block.call", () => {
+	const eventsPath = makeEventsPath();
+	const res = spawnHost(path.join(fixturesDir, "blocking.cjs"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		BACKEND_DOCTOR_PROBE_COLLECTORS: COLLECTORS,
+		BACKEND_DOCTOR_PROBE_FILTERS: JSON.stringify(["**/blocking.cjs"]),
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+	expect(blockCalls(eventsPath).length).toBeGreaterThanOrEqual(1);
+});

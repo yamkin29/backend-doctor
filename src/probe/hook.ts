@@ -14,6 +14,7 @@ import path from "node:path";
 import { monitorEventLoopDelay } from "node:perf_hooks";
 import process from "node:process";
 import zlib from "node:zlib";
+import picomatch from "picomatch";
 
 interface ProbeEvent {
 	type: string;
@@ -185,6 +186,33 @@ function roundMs(value: number): number {
 }
 
 /**
+ * The `--filter` globs the parent recorded for this session (spec 018
+ * metadata, spec 019 enforcement): block.call events are restricted to
+ * culprit paths matching at least one glob. Absent = no restriction;
+ * present but malformed = one notice, then no restriction.
+ */
+function parseFilters(raw: string | undefined): {
+	globs: string[];
+	malformed: boolean;
+} {
+	if (raw === undefined || raw === "") {
+		return { globs: [], malformed: false };
+	}
+	try {
+		const value: unknown = JSON.parse(raw);
+		if (
+			Array.isArray(value) &&
+			value.every((item) => typeof item === "string")
+		) {
+			return { globs: value as string[], malformed: false };
+		}
+	} catch {
+		// malformed JSON — reported by the malformed flag below
+	}
+	return { globs: [], malformed: true };
+}
+
+/**
  * Blocking-call collector: wraps known sync blocking APIs of node core; a
  * call taking >= blockThresholdMs records a block.call event attributed to
  * the first stack frame outside node internals and node_modules. The stack
@@ -210,6 +238,20 @@ function installBlockingCollector(settings: CollectorSettings): void {
 	asyncHook.enable();
 
 	const cwd = process.cwd();
+
+	const filters = parseFilters(process.env.BACKEND_DOCTOR_PROBE_FILTERS);
+	if (filters.malformed) {
+		notice(
+			"invalid filter globs (BACKEND_DOCTOR_PROBE_FILTERS); recording without restrictions",
+		);
+	}
+	// dot: true, same as the gitignore matcher — hidden directories match.
+	const filterMatchers = filters.globs.map((glob) =>
+		picomatch(glob, { dot: true }),
+	);
+	const passesFilter = (recordedPath: string): boolean =>
+		filterMatchers.length === 0 ||
+		filterMatchers.some((match) => match(recordedPath));
 
 	function relativeToCwd(file: string): string {
 		if (!path.isAbsolute(file)) return file;
@@ -272,6 +314,8 @@ function installBlockingCollector(settings: CollectorSettings): void {
 		}
 		const culprit = culpritFrom(sites);
 		if (culprit === null) return;
+		const recordedPath = relativeToCwd(culprit.file);
+		if (!passesFilter(recordedPath)) return;
 		const tag = asyncTag();
 		writeEvent({
 			type: "block.call",
@@ -279,7 +323,7 @@ function installBlockingCollector(settings: CollectorSettings): void {
 			pid: process.pid,
 			api,
 			durationMs,
-			file: relativeToCwd(culprit.file),
+			file: recordedPath,
 			line: culprit.line,
 			column: culprit.column,
 			function: culprit.function,
