@@ -514,3 +514,86 @@ test("http inert: emit stays native without the collectors env", () => {
 	);
 	expect(active.stdout?.trim()).toBe("patched");
 });
+
+function dbQueries(eventsPath: string): Array<Record<string, unknown>> {
+	return parseEvents(eventsPath).filter((event) => event.type === "db.query");
+}
+
+test("db: CJS client wraps; queries attribute to the enclosing request", () => {
+	const eventsPath = makeEventsPath();
+	const res = spawnHost(path.join(fixturesDir, "prisma-app.cjs"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		BACKEND_DOCTOR_PROBE_COLLECTORS: COLLECTORS,
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+	expect(res.stdout).toContain("prisma-app-done");
+
+	const queries = dbQueries(eventsPath);
+	// 1 startup + 3 bulk; the /other handler issues no query.
+	expect(queries).toHaveLength(4);
+	const startup = queries.find((query) => query.action === "queryRaw");
+	expect(startup?.model).toBeNull();
+	expect(startup?.attributed).toBe(false);
+	const bulkQueries = queries.filter(
+		(query) => query.model === "User" && query.action === "findMany",
+	);
+	expect(bulkQueries).toHaveLength(3);
+	for (const query of bulkQueries) {
+		expect(query.attributed).toBe(true);
+		expect(typeof query.durationMs).toBe("number");
+	}
+
+	const requests = httpRequests(eventsPath);
+	expect(requests.find((event) => event.route === "/bulk")?.dbQueries).toBe(3);
+	expect(requests.find((event) => event.route === "/other")?.dbQueries).toBe(0);
+}, 15000);
+
+test("db: ESM named import wraps identically", () => {
+	const eventsPath = makeEventsPath();
+	const res = spawnHost(path.join(fixturesDir, "prisma-app.mjs"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		BACKEND_DOCTOR_PROBE_COLLECTORS: COLLECTORS,
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+	expect(res.stdout).toContain("prisma-esm-done");
+
+	const queries = dbQueries(eventsPath);
+	expect(queries).toHaveLength(2);
+	expect(queries[0]?.attributed).toBe(false);
+	expect(queries[1]?.attributed).toBe(true);
+	expect(queries[1]?.model).toBe("User");
+}, 15000);
+
+test("db: a client without $use degrades with one notice; http keeps recording", () => {
+	const eventsPath = makeEventsPath();
+	const res = spawnHost(path.join(fixturesDir, "prisma-app.cjs"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		BACKEND_DOCTOR_PROBE_COLLECTORS: COLLECTORS,
+		FAKE_PRISMA_NO_USE: "1",
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+	expect(res.stdout).toContain("prisma-app-done");
+
+	const notices = res.stderr.match(/prisma client without \$use/g) ?? [];
+	expect(notices).toHaveLength(1);
+	expect(dbQueries(eventsPath)).toHaveLength(0);
+	expect(httpRequests(eventsPath).length).toBeGreaterThanOrEqual(2);
+}, 15000);
+
+test("db inert: the client class stays native without the collectors env", () => {
+	const inertCheck = (env: Record<string, string | undefined>): string => {
+		const res = spawnHost(path.join(fixturesDir, "prisma-inert.cjs"), env);
+		expect(res.status, res.statusMessage).toBe(0);
+		return res.stdout.trim();
+	};
+	expect(inertCheck({ BACKEND_DOCTOR_PROBE_EVENTS: undefined })).toBe("native");
+	expect(inertCheck({ BACKEND_DOCTOR_PROBE_EVENTS: makeEventsPath() })).toBe(
+		"native",
+	);
+	expect(
+		inertCheck({
+			BACKEND_DOCTOR_PROBE_EVENTS: makeEventsPath(),
+			BACKEND_DOCTOR_PROBE_COLLECTORS: COLLECTORS,
+		}),
+	).toBe("wrapped");
+});

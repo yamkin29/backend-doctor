@@ -11,6 +11,7 @@ import childProcess from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
+import Module from "node:module";
 import path from "node:path";
 import {
 	constants,
@@ -456,6 +457,7 @@ function installCollectors(settings: CollectorSettings): void {
 		["blocking-call", () => installBlockingCollector(settings)],
 		["memory/gc", () => installMemoryCollector(settings)],
 		["http", () => installHttpCollector(requestContext)],
+		["db-query", () => installDbCollector(requestContext)],
 	];
 	for (const [name, install] of installs) {
 		try {
@@ -700,4 +702,144 @@ if (attachFlag.__backendDoctorProbeHook) {
 	} else {
 		notice("loaded outside a probe session; staying inert");
 	}
+}
+
+// ---- DB-query collector (spec 020) ----
+
+interface PrismaQueryParams {
+	model?: string | null;
+	action?: string;
+}
+
+interface PrismaMiddlewareApi {
+	$use: (
+		middleware: (
+			params: PrismaQueryParams,
+			next: (params: PrismaQueryParams) => Promise<unknown>,
+		) => Promise<unknown>,
+	) => void;
+}
+
+const DB_MARKER = "__backendDoctorProbeDbWrapped";
+// CJS require("@prisma/client") arrives as the bare specifier; an ESM named
+// import arrives as the resolved absolute path (verified, Node 22) — match
+// both forms for both module ids.
+const PRISMA_MODULE_IDS = ["@prisma/client", ".prisma/client"] as const;
+
+/**
+ * Intercepts @prisma/client and .prisma/client loads and wraps the exported
+ * PrismaClient class as a subclass whose constructor installs one $use
+ * middleware per instance: the middleware times the query, records a
+ * db.query event, and increments the enclosing request's ALS store. The
+ * idempotency marker sits on the CLASS, not the exports — @prisma/client
+ * copies the generated client's properties, so a wrapped class re-appears on
+ * a new exports object without any exports-level marker. No SQL text, args,
+ * or results are ever captured (constitution §9).
+ */
+function installDbCollector(
+	requestContext: asyncHooks.AsyncLocalStorage<{ dbQueries: number }>,
+): void {
+	let disabled = false;
+
+	function recordQuery(
+		params: PrismaQueryParams,
+		startedAt: number,
+		attributed: boolean,
+	): void {
+		try {
+			writeEvent({
+				type: "db.query",
+				timestamp: new Date().toISOString(),
+				pid: process.pid,
+				model: typeof params.model === "string" ? params.model : null,
+				action: typeof params.action === "string" ? params.action : "",
+				durationMs: roundMs(performance.now() - startedAt),
+				attributed,
+			});
+		} catch (error) {
+			disabled = true;
+			notice(`db-query collector disabled (${(error as Error).message})`);
+		}
+	}
+
+	function wrapClientOnce(record: Record<string, unknown>): void {
+		if (disabled) return;
+		const Client = record.PrismaClient;
+		if (typeof Client !== "function") return;
+		if ((Client as unknown as Record<string, unknown>)[DB_MARKER] === true) {
+			return;
+		}
+		const prototype = (Client as { prototype?: Record<string, unknown> })
+			.prototype;
+		if (
+			prototype === undefined ||
+			prototype === null ||
+			typeof prototype.$use !== "function"
+		) {
+			disabled = true;
+			notice("prisma client without $use found; db-query collector disabled");
+			return;
+		}
+		class WrappedPrismaClient extends (Client as new (
+			...args: unknown[]
+		) => PrismaMiddlewareApi) {
+			constructor(...args: unknown[]) {
+				super(...args);
+				this.$use((params, next) => {
+					if (disabled) return next(params);
+					const store = requestContext.getStore();
+					if (store !== undefined) store.dbQueries++;
+					const startedAt = performance.now();
+					const result = next(params);
+					if (
+						result !== null &&
+						typeof result === "object" &&
+						typeof (result as Promise<unknown>).then === "function"
+					) {
+						return (result as Promise<unknown>).then(
+							(value) => {
+								recordQuery(params, startedAt, store !== undefined);
+								return value;
+							},
+							(error: unknown) => {
+								recordQuery(params, startedAt, store !== undefined);
+								throw error;
+							},
+						);
+					}
+					recordQuery(params, startedAt, store !== undefined);
+					return result;
+				});
+			}
+		}
+		Object.defineProperty(WrappedPrismaClient, DB_MARKER, { value: true });
+		record.PrismaClient = WrappedPrismaClient;
+	}
+
+	const isTarget = (request: unknown): boolean => {
+		const id = String(request);
+		return PRISMA_MODULE_IDS.some(
+			(target) => id === target || id.includes(`node_modules/${target}/`),
+		);
+	};
+
+	// Module._load exists at runtime but is not on @types/node's Module
+	// statics — the cast documents the calling convention.
+	const moduleStatics = Module as unknown as {
+		_load: (...args: unknown[]) => unknown;
+	};
+	const originalLoad = moduleStatics._load;
+	moduleStatics._load = function (...loadArgs: unknown[]): unknown {
+		const request = String(loadArgs[0]);
+		const loaded = originalLoad.apply(this, loadArgs);
+		try {
+			if (isTarget(request) && typeof loaded === "object" && loaded !== null) {
+				wrapClientOnce(loaded as Record<string, unknown>);
+			}
+		} catch (error) {
+			disabled = true;
+			notice(`db-query collector disabled (${(error as Error).message})`);
+		}
+		return loaded;
+	};
 }
