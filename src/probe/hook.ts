@@ -6,9 +6,14 @@
 // import from src/probe/* (spec 018 design decision 9) — the event shapes
 // mirror src/probe/types.ts by hand.
 
+import asyncHooks from "node:async_hooks";
+import childProcess from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
+import path from "node:path";
 import { monitorEventLoopDelay } from "node:perf_hooks";
 import process from "node:process";
+import zlib from "node:zlib";
 
 interface ProbeEvent {
 	type: string;
@@ -27,6 +32,9 @@ const MIN_LAG_INTERVAL_MS = 50;
 
 const attachFlag = globalThis as { __backendDoctorProbeHook?: boolean };
 let recordable = true;
+// While the hook writes an event, its own fs appends must stay invisible to
+// the blocking collector (spec 019 AC-6).
+let inHookWrite = false;
 // Set by the lag collector; the exit listener flushes the final window.
 let flushLag: ((final: boolean) => void) | null = null;
 
@@ -42,6 +50,7 @@ function writeEvent(event: ProbeEvent): void {
 	if (!recordable) return;
 	const eventsPath = process.env.BACKEND_DOCTOR_PROBE_EVENTS;
 	if (eventsPath === undefined || eventsPath === "") return;
+	inHookWrite = true;
 	try {
 		// One appendFileSync per event: O_APPEND keeps concurrent writes from
 		// descendant processes line-atomic on POSIX.
@@ -51,6 +60,8 @@ function writeEvent(event: ProbeEvent): void {
 		notice(
 			`could not record events (${(error as Error).message}); staying inert`,
 		);
+	} finally {
+		inHookWrite = false;
 	}
 }
 
@@ -139,9 +150,244 @@ function installLagMonitor(settings: CollectorSettings): void {
 	timer.unref();
 }
 
+// ---- blocking-call collector ----
+
+interface StackHolder {
+	stack?: unknown;
+}
+
+interface Culprit {
+	file: string;
+	line: number | null;
+	column: number | null;
+	function: string | null;
+}
+
+const ASYNC_MAP_CAP = 131072;
+const ROOT_WALK_LIMIT = 64;
+const CRYPTO_APIS = [
+	"pbkdf2Sync",
+	"scryptSync",
+	"randomBytes",
+	"randomFillSync",
+	"generateKeyPairSync",
+	"generateKeySync",
+	"generatePrimeSync",
+	"checkPrimeSync",
+	"hkdfSync",
+	"sign",
+	"verify",
+] as const;
+const CHILD_PROCESS_APIS = ["execSync", "spawnSync", "execFileSync"] as const;
+
+function roundMs(value: number): number {
+	return Math.round(value * 1000) / 1000;
+}
+
+/**
+ * Blocking-call collector: wraps known sync blocking APIs of node core; a
+ * call taking >= blockThresholdMs records a block.call event attributed to
+ * the first stack frame outside node internals and node_modules. The stack
+ * is captured at call entry (cheap, unformatted) and only formatted when the
+ * call turns out slow — with Error.prepareStackTrace set and restored inside
+ * one synchronous block, so it is never left patched (§7).
+ */
+function installBlockingCollector(settings: CollectorSettings): void {
+	// Async-context registry: asyncId → (type, trigger). Destroyed entries
+	// are pruned; if the map ever exceeds the cap the registry simply stops
+	// growing (tags become unavailable for new resources, nothing crashes).
+	const asyncInfo = new Map<number, { type: string; trigger: number }>();
+	const asyncHook = asyncHooks.createHook({
+		init(asyncId, type, triggerAsyncId) {
+			if (asyncInfo.size < ASYNC_MAP_CAP) {
+				asyncInfo.set(asyncId, { type, trigger: triggerAsyncId });
+			}
+		},
+		destroy(asyncId) {
+			asyncInfo.delete(asyncId);
+		},
+	});
+	asyncHook.enable();
+
+	const cwd = process.cwd();
+
+	function relativeToCwd(file: string): string {
+		if (!path.isAbsolute(file)) return file;
+		const rel = path.relative(cwd, file);
+		if (rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel)) {
+			return rel;
+		}
+		return file;
+	}
+
+	function asyncTag(): { type: string; rootType: string } | undefined {
+		const info = asyncInfo.get(asyncHooks.executionAsyncId());
+		if (info === undefined) return undefined;
+		let rootType = info.type;
+		let cursor = info.trigger;
+		for (let depth = 0; depth < ROOT_WALK_LIMIT && cursor > 1; depth++) {
+			const up = asyncInfo.get(cursor);
+			if (up === undefined) break;
+			rootType = up.type;
+			cursor = up.trigger;
+		}
+		return { type: info.type, rootType };
+	}
+
+	function culpritFrom(sites: unknown[]): Culprit | null {
+		let fallback: Culprit | null = null;
+		for (const site of sites as NodeJS.CallSite[]) {
+			if (site.isNative()) continue;
+			const file = site.getFileName();
+			if (file === null || file === "" || file.startsWith("node:")) {
+				continue;
+			}
+			// Belt and suspenders: captureStackTrace(holder, wrapped) already
+			// crops the wrapper's own frames.
+			if (file.endsWith("register.cjs")) continue;
+			const frame: Culprit = {
+				file,
+				line: site.getLineNumber(),
+				column: site.getColumnNumber(),
+				function: site.getFunctionName(),
+			};
+			if (fallback === null) fallback = frame;
+			if (!file.includes("node_modules")) return frame;
+		}
+		return fallback;
+	}
+
+	function recordBlockCall(
+		api: string,
+		durationMs: number,
+		holder: StackHolder,
+	): void {
+		const previous = Error.prepareStackTrace;
+		Error.prepareStackTrace = (_error, frames) => frames;
+		let sites: unknown[];
+		try {
+			sites = holder.stack as unknown[];
+		} finally {
+			Error.prepareStackTrace = previous;
+		}
+		const culprit = culpritFrom(sites);
+		if (culprit === null) return;
+		const tag = asyncTag();
+		writeEvent({
+			type: "block.call",
+			timestamp: new Date().toISOString(),
+			pid: process.pid,
+			api,
+			durationMs,
+			file: relativeToCwd(culprit.file),
+			line: culprit.line,
+			column: culprit.column,
+			function: culprit.function,
+			...(tag !== undefined ? { async: tag } : {}),
+		});
+	}
+
+	let disabled = false;
+
+	function wrap(
+		moduleObject: Record<string, unknown>,
+		prefix: string,
+		name: string,
+	): void {
+		const api = `${prefix}.${name}`;
+		const original = moduleObject[name];
+		if (typeof original !== "function") return;
+		const wrapped = function (this: unknown, ...args: unknown[]): unknown {
+			if (disabled || inHookWrite) {
+				return (original as (...args: unknown[]) => unknown).apply(this, args);
+			}
+			const holder: StackHolder = {};
+			Error.captureStackTrace(holder, wrapped);
+			const start = performance.now();
+			try {
+				return (original as (...args: unknown[]) => unknown).apply(this, args);
+			} finally {
+				const durationMs = performance.now() - start;
+				if (durationMs >= settings.blockThresholdMs) {
+					try {
+						recordBlockCall(api, roundMs(durationMs), holder);
+					} catch (error) {
+						// One loud notice, then this collector stands down (§7/§8).
+						disabled = true;
+						notice(
+							`blocking-call collector disabled (${(error as Error).message})`,
+						);
+					}
+				}
+			}
+		};
+		Object.defineProperty(wrapped, "name", {
+			value: original.name,
+			configurable: true,
+		});
+		// Non-enumerable marker: the observable "is this instrumented" probe
+		// (core functions are mostly JS in lib/, so toString() cannot tell).
+		Object.defineProperty(wrapped, "__backendDoctorProbeWrapped", {
+			value: true,
+			enumerable: false,
+			configurable: true,
+		});
+		moduleObject[name] = wrapped;
+	}
+
+	function wrapAll(
+		moduleObject: Record<string, unknown>,
+		prefix: string,
+		names: readonly string[],
+	): void {
+		for (const name of names) wrap(moduleObject, prefix, name);
+	}
+
+	// Core modules are singletons shared between require() and import(), and
+	// the preload patches before user code links — so CJS and ESM named
+	// imports both see the wrappers (verified on Node 22, spec 019).
+	try {
+		const fsMod = fs as unknown as Record<string, unknown>;
+		wrapAll(
+			fsMod,
+			"fs",
+			Object.keys(fsMod).filter(
+				(key) => typeof fsMod[key] === "function" && key.endsWith("Sync"),
+			),
+		);
+		const realpathSync = fsMod.realpathSync as Record<string, unknown>;
+		if (typeof realpathSync.native === "function") {
+			wrap(realpathSync, "fs.realpathSync", "native");
+		}
+		wrapAll(
+			crypto as unknown as Record<string, unknown>,
+			"crypto",
+			CRYPTO_APIS,
+		);
+		wrapAll(
+			childProcess as unknown as Record<string, unknown>,
+			"child_process",
+			CHILD_PROCESS_APIS,
+		);
+		wrapAll(
+			zlib as unknown as Record<string, unknown>,
+			"zlib",
+			Object.keys(zlib as unknown as Record<string, unknown>).filter(
+				(key) =>
+					typeof (zlib as unknown as Record<string, unknown>)[key] ===
+						"function" && key.endsWith("Sync"),
+			),
+		);
+	} catch (error) {
+		notice(
+			`blocking-call collector failed to install (${(error as Error).message}); continuing without it`,
+		);
+	}
+}
+
 function installCollectors(settings: CollectorSettings): void {
 	installLagMonitor(settings);
-	// The blocking-call collector lands with spec 019 T4.
+	installBlockingCollector(settings);
 }
 
 if (attachFlag.__backendDoctorProbeHook) {

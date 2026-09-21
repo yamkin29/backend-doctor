@@ -236,3 +236,117 @@ test("malformed collectors JSON: one notice, lifecycle-only", () => {
 	]);
 	expect(events[0]?.collectors).toBeUndefined();
 });
+
+function makeBigFile(): string {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bd-block-"));
+	const target = path.join(dir, "big.bin");
+	fs.writeFileSync(target, Buffer.alloc(32 * 1024 * 1024, 1));
+	return target;
+}
+
+function blockCalls(eventsPath: string): Array<Record<string, unknown>> {
+	return parseEvents(eventsPath).filter((event) => event.type === "block.call");
+}
+
+test("blocking: slow sync calls are attributed to the fixture", () => {
+	const eventsPath = makeEventsPath();
+	const target = makeBigFile();
+	const res = spawnHost(path.join(fixturesDir, "blocking.cjs"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		// 1ms threshold: even a page-cached big read clears it reliably.
+		BACKEND_DOCTOR_PROBE_COLLECTORS: JSON.stringify({
+			blockThresholdMs: 1,
+			lagIntervalMs: 1000,
+		}),
+		BLOCK_TARGET: target,
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+	expect(res.stdout).toContain("blocking-done");
+
+	const calls = blockCalls(eventsPath);
+	expect(calls.length).toBeGreaterThanOrEqual(2);
+	const cryptoCall = calls.find((event) => event.api === "crypto.pbkdf2Sync");
+	expect(cryptoCall, "crypto call recorded").toBeDefined();
+	expect(cryptoCall?.durationMs as number).toBeGreaterThanOrEqual(10);
+	expect(String(cryptoCall?.file)).toMatch(/blocking\.cjs$/);
+	expect(typeof cryptoCall?.line).toBe("number");
+	expect(typeof cryptoCall?.column).toBe("number");
+
+	const fsCall = calls.find((event) => event.api === "fs.readFileSync");
+	expect(fsCall, "fs call recorded").toBeDefined();
+	// The configured threshold in this test is 1ms.
+	expect(fsCall?.durationMs as number).toBeGreaterThanOrEqual(1);
+	expect(String(fsCall?.file)).toMatch(/blocking\.cjs$/);
+
+	for (const call of calls) {
+		expect(typeof call.timestamp).toBe("string");
+		expect(typeof call.pid).toBe("number");
+	}
+});
+
+test("blocking: ESM named imports are attributed", () => {
+	const eventsPath = makeEventsPath();
+	const res = spawnHost(path.join(fixturesDir, "blocking.mjs"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		BACKEND_DOCTOR_PROBE_COLLECTORS: COLLECTORS,
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+	expect(res.stdout).toContain("blocking-done");
+
+	const calls = blockCalls(eventsPath);
+	const cryptoCall = calls.find((event) => event.api === "crypto.pbkdf2Sync");
+	expect(cryptoCall, "ESM crypto call recorded").toBeDefined();
+	expect(cryptoCall?.durationMs as number).toBeGreaterThanOrEqual(10);
+	expect(String(cryptoCall?.file)).toMatch(/blocking\.mjs$/);
+});
+
+test("blocking: inert hook leaves core functions native", () => {
+	// Core functions are mostly JS in lib/, so toString() cannot tell — the
+	// wrapper carries a non-enumerable marker property instead.
+	const check = `console.log(require("node:fs").readFileSync.__backendDoctorProbeWrapped === true ? "patched" : "native");`;
+
+	const inert = spawnSync(
+		process.execPath,
+		["--require", hookPath, "-e", check],
+		{
+			encoding: "utf8",
+			env: { ...process.env, BACKEND_DOCTOR_PROBE_EVENTS: undefined },
+			timeout: 15000,
+		},
+	);
+	expect(inert.stdout?.trim()).toBe("native");
+
+	const active = spawnSync(
+		process.execPath,
+		["--require", hookPath, "-e", check],
+		{
+			encoding: "utf8",
+			env: {
+				...process.env,
+				BACKEND_DOCTOR_PROBE_EVENTS: makeEventsPath(),
+				BACKEND_DOCTOR_PROBE_COLLECTORS: COLLECTORS,
+			},
+			timeout: 15000,
+		},
+	);
+	expect(active.stdout?.trim()).toBe("patched");
+});
+
+test("blocking: never attributes the hook bundle or node internals", () => {
+	const eventsPath = makeEventsPath();
+	const res = spawnHost(path.join(fixturesDir, "blocking.cjs"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		BACKEND_DOCTOR_PROBE_COLLECTORS: COLLECTORS,
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+
+	for (const call of blockCalls(eventsPath)) {
+		expect(String(call.file)).not.toContain("register.cjs");
+		expect(String(call.file)).not.toMatch(/^node:/);
+		expect(
+			call.function === null ||
+				call.function === "" ||
+				typeof call.function === "string",
+		).toBe(true);
+	}
+});
