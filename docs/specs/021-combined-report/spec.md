@@ -1,6 +1,6 @@
 # Spec 021 — Combined report (static + runtime) (F021)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-21)
 - **Phase:** 5 — Runtime engine
 - **Depends on:** F018 Runtime probe runner (Done — the session directory and
   `findings.json` exist as a versioned contract), F019 Event loop & blocking
@@ -360,6 +360,15 @@ byte-identical output for every format.
 - Build: no new entries — the merge ships inside the existing bin bundle.
 
 ## Open questions for review
+
+All five were resolved on approval (2026-09-21) by adopting the
+recommendations: (1) the merge lives in `scan --trace <session-dir>` — one
+additive flag, no new command, no probe-side changes; (2) runtime diagnostics
+are exactly blocking call sites and N+1 endpoints, derived from structured
+findings, with `findings.warnings[]` never duplicated into the report; (3)
+runtime diagnostics are always `warn` and never affect exit codes; (4) the
+report document grows an additive optional `runtime` block and
+`schemaVersion` stays `1`; (5) no new dependencies.
 
 - **OQ-1 — where the merge lives (contract; user-owned).**
   Recommendation: **`scan --trace <session-dir>`** — one additive flag on the
