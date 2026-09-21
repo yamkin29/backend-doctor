@@ -1,6 +1,6 @@
 # Spec 020 — HTTP runtime tracing (F020)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-21)
 - **Phase:** 5 — Runtime engine
 - **Depends on:** F018 Runtime probe runner (Done — session layout, `NODE_OPTIONS`
   hook injection, NDJSON discipline, `runCliAsync`), F019 Event loop & blocking
@@ -478,6 +478,16 @@ Top-level key order: `traceSchemaVersion`, `sessionId`, `collectors`,
   bundle.
 
 ## Open questions for review
+
+All four were resolved on approval (2026-09-21) by adopting the recommendations:
+(1) no new dependencies — a fixture-local fake Prisma client and emulated route
+markers stand in for real frameworks, whose validation belongs to F022's eval
+corpus; (2) DB-query counting is Prisma-only via `Module._load` interception +
+`$use` middleware, with one-notice graceful degradation when `$use` is
+unavailable; (3) N+1 detection is a threshold warning, default 20, env-tunable
+via `BACKEND_DOCTOR_PROBE_N1_THRESHOLD` (parent-validated, invalid → exit 2);
+(4) `n1Threshold` joins the `collectors` settings block, and the existing
+exact-key-set pins are updated accordingly.
 
 - **OQ-1 — dependencies: none vs adding `express` + `@prisma/client` as
   devDependencies for true-framework e2e.** Recommendation: **none** — the
