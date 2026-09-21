@@ -402,3 +402,55 @@ Under interop, a module **without** a default export exposes a *virtual*
   fixtures that use `require()` must be `.cjs` (`spin.cjs`, `blocking.cjs`);
   a `.js` fixture dies with "require is not defined in ES module scope" —
   the spec 014 vitest-collection lesson's runtime twin.
+
+### HTTP/db/memory collectors (spec 020)
+
+- **A monkey-patched `emit` passthrough must re-join the event name with the
+  rest args.** `function (event, ...args)` + a helper doing
+  `originalEmit.apply(this, args)` silently turns every host emit into
+  `emit(undefined)` — no listener ever runs, `server.listen`'s callback
+  never fires, and the app hangs idle with a half-bound socket (no crash,
+  no error). Bit spec 020 T5; the self-fetching HTTP fixture caught it in
+  the red state. The helper must take `(event, args)` and apply
+  `[event, ...args]`.
+- **`AsyncLocalStorage.run(store, callback)` invokes the callback without a
+  `this`.** Handing `http.Server.prototype.emit` (or any method) directly as
+  the callback crashes the host with a TypeError inside `EventEmitter.emit`
+  (`this._events` of null). Wrap it: `als.run(store, () =>
+  originalEmit.apply(this, [event, ...args]))`. Verified on Node 22.13.1
+  (bit spec 020 T5, same session as the bug above).
+- **`Server.prototype.emit` wrapping is transparent to node internals** —
+  plain `http`/`https` servers (Express/Fastify/Nest ride them) keep
+  working; `node:http2` is a separate class and stays uninstrumented.
+  Preserving the wrapper's `name` (`Object.defineProperty(…, "name", …)`)
+  plus a non-enumerable marker property remains the observable-inertness
+  probe (F019's pattern).
+- **`Module._load` interception sees two call forms.** A CJS
+  `require("@prisma/client")` arrives as the bare specifier; an ESM named
+  import of the same CJS package arrives post-resolution as an absolute
+  `node_modules/@prisma/client/index.js` path with `parent === undefined`.
+  Match both: `id === request || request.includes("node_modules/" + id +
+  "/")`. `Module._load` is also absent from @types/node's Module statics —
+  cast. Verified live on Node 22.13.1 (spec 020 T6).
+- **Idempotency markers for class wraps belong on the class, not the
+  exports.** `@prisma/client` copies the generated client's properties (a
+  spread), so a wrapped class re-appears on a new exports object without
+  any exports-level marker; the class-level marker survives the copy and
+  prevents double wrapping (= double counting).
+- **Prisma `$use` middleware is the stable counting surface** (works across
+  Prisma 5/6): subclass the exported `PrismaClient`, install one middleware
+  per instance in the constructor, read only `params.model`/`params.action`
+  and wall time. `next(params)` returns a promise — record on settle via
+  then/catch re-throw. A client without `$use` → one notice, collector
+  stands down (spec 020 AC-7).
+- **`PerformanceObserver` holds no event-loop reference** (Node 22.13.1):
+  there is no `unref()` and none is needed — the host exits normally with
+  the observer attached. GC kinds live on `entry.detail` (`{kind, flags}`);
+  the legacy `entry.kind` accessor emits DEP0152, and `detail` is missing
+  from @types/node's `PerformanceEntry` — cast. Constants:
+  `NODE_PERFORMANCE_GC_MINOR 1 / MAJOR 4 / INCREMENTAL 8 / WEAKCB 16`.
+- **A fixture-local `node_modules/` needs `git add -f`.** The root
+  `.gitignore`'s `node_modules/` pattern matches at every depth, so
+  `tests/fixtures/probe/node_modules/@prisma/client/` silently skips a
+  plain `git add` and CI fails on a fresh clone — the spec 014 `.env`
+  lesson's exact twin; add the directory with `-f`.

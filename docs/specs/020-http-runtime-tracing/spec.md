@@ -1,6 +1,6 @@
 # Spec 020 — HTTP runtime tracing (F020)
 
-- **Status:** Approved (2026-09-21)
+- **Status:** Implemented (2026-09-21)
 - **Phase:** 5 — Runtime engine
 - **Depends on:** F018 Runtime probe runner (Done — session layout, `NODE_OPTIONS`
   hook injection, NDJSON discipline, `runCliAsync`), F019 Event loop & blocking
