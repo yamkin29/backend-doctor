@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { allProjectRules, allRules } from "../../src/engine/registry.js";
@@ -8,7 +9,7 @@ import {
 	BAD_APP_FILES,
 	GOOD_APP_FILES,
 } from "./goldens/eval-corpus.js";
-import { expectSuccess, runCli } from "./helpers.js";
+import { expectSuccess, makeTmpDir, runCli, runCliAsync } from "./helpers.js";
 
 const GOOD_APP = path.resolve(import.meta.dirname, "../../evals/nest-good");
 const BAD_APP = path.resolve(import.meta.dirname, "../../evals/nest-bad");
@@ -172,4 +173,38 @@ describe("e2e: eval corpus — coverage and jsonl (spec 022 AC-5, AC-6)", () => 
 		expectSuccess(clean, 0);
 		expect(clean.stdout).toBe("");
 	});
+});
+
+describe("e2e: eval corpus — probe (spec 022 AC-8)", () => {
+	it(
+		"attributes deliberate blocking to the bad app's worker script",
+		async () => {
+			const outDir = makeTmpDir();
+			const result = await runCliAsync(
+				["probe", "--out", outDir, "--", "node", "scripts/blocking.cjs"],
+				{ cwd: BAD_APP },
+			);
+			expect(result.exitCode, result.stderr).toBe(0);
+
+			const entries = fs.readdirSync(outDir);
+			expect(entries, "exactly one session directory").toHaveLength(1);
+			const sessionDir = path.join(outDir, entries[0] as string);
+			const findings = JSON.parse(
+				fs.readFileSync(path.join(sessionDir, "findings.json"), "utf8"),
+			) as {
+				blocking: {
+					count: number;
+					calls: Array<{ file: string; api: string }>;
+				};
+			};
+			expect(findings.blocking.count).toBeGreaterThanOrEqual(1);
+			// The culprit path is recorded relative to the probe cwd — the bad
+			// app's own worker, not a fixture copy.
+			expect(findings.blocking.calls[0]?.file).toBe("scripts/blocking.cjs");
+
+			// Storage went to --out: nothing may leak into the corpus tree.
+			expect(fs.existsSync(path.join(BAD_APP, ".backend-doctor"))).toBe(false);
+		},
+		{ timeout: 30000 },
+	);
 });
