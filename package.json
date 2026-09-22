@@ -4,6 +4,24 @@
 	"description": "Deterministic static analyzer for Node.js/NestJS backends.",
 	"type": "module",
 	"license": "MIT",
+	"author": "Aleksey Yamkin",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/yamkin29/backend-doctor.git"
+	},
+	"homepage": "https://github.com/yamkin29/backend-doctor#readme",
+	"bugs": {
+		"url": "https://github.com/yamkin29/backend-doctor/issues"
+	},
+	"keywords": [
+		"nestjs",
+		"nodejs",
+		"backend",
+		"static-analysis",
+		"lint",
+		"prisma",
+		"code-quality"
+	],
 	"engines": {
 		"node": ">=20"
 	},

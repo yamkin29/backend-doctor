@@ -37,4 +37,29 @@ describe("package.json publish contract (spec 023)", () => {
 			"node dist/scripts/rule-docs.js --check",
 		);
 	});
+
+	it("pins the registry-facing identity metadata", () => {
+		// Post-rename GitHub coordinates per spec 023 OQ-4 (consistent with the
+		// F016 action-ref decision); the user renames the repo at/before publish.
+		expect(pkg.author).toBe("Aleksey Yamkin");
+		expect(pkg.repository).toEqual({
+			type: "git",
+			url: "git+https://github.com/yamkin29/backend-doctor.git",
+		});
+		expect(pkg.homepage).toBe(
+			"https://github.com/yamkin29/backend-doctor#readme",
+		);
+		expect(pkg.bugs).toEqual({
+			url: "https://github.com/yamkin29/backend-doctor/issues",
+		});
+		expect(pkg.keywords).toEqual([
+			"nestjs",
+			"nodejs",
+			"backend",
+			"static-analysis",
+			"lint",
+			"prisma",
+			"code-quality",
+		]);
+	});
 });
