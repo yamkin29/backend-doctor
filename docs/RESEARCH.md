@@ -207,6 +207,26 @@ Under interop, a module **without** a default export exposes a *virtual*
 - vitest `--no-cache` exists and helps when debugging transform staleness; prefer
   fixing the cause over trusting cache invalidation.
 
+### Test-environment determinism (colors, vitest timeouts)
+
+- **picocolors turns colors ON whenever the `CI` env var is set — even piped, no
+  TTY** (`|| !!env.CI` in its detection). Output built with `pc.*` (the pretty
+  reporter) therefore carries ANSI escapes on GitHub Actions but not locally, and
+  byte-pinned assertions (`toBe`/`toContain` on plain text) fail only in CI (bit
+  the spec 021 e2e and the reporters unit test; the suite stayed green on macOS
+  the whole time). A non-empty `NO_COLOR` wins unconditionally — it is the first
+  clause of picocolors' detection.
+- **`vitest.config.ts` → `test.env: { NO_COLOR: "1" }` is the one-line fix:** it
+  lands on the worker's `process.env` before test files import the reporter, and
+  every spawned CLI child inherits it — both in-process (`renderPretty`) and e2e
+  (`runCli`/`runCliAsync`) assertions stay plain-text everywhere.
+- **`test(name, fn, { timeout })` is deprecated in vitest 3** ("object as a third
+  argument") and Vitest 4 throws on any non-number third argument. The options
+  object belongs in the second argument: `test(name, { timeout }, fn)`. The
+  deprecation warning prints once per call site, attributed to the test file's
+  stderr block — count them in the log, don't assume every `{ timeout }` in the
+  file is a vitest call (poll helpers and `spawnSync` take their own).
+
 ### npm names
 
 - Taken: `node-doctor` (env diagnostics CLI), `nest-doctor` (abandoned Nest helper).
