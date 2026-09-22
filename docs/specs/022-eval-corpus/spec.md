@@ -1,6 +1,6 @@
 # Spec 022 — Eval corpus & precision gate (F022)
 
-- **Status:** Draft — pending review
+- **Status:** Approved (2026-09-22 — all open-question recommendations accepted)
 - **Phase:** 6 — Quality & release
 - **Depends on:** F001–F021 (all Done) — the corpus exercises the full shipped
   surface: 36 AST rules, 6 project rules, framework detection, reporters, probe.
@@ -9,7 +9,8 @@
 
 ## Problem
 
-All 42 registered rules were built against per-rule micro-fixtures
+All 41 registered rules (35 AST + 6 project — counted in `src/rules/index.ts`
+and `docs/rules/backend-doctor/`) were built against per-rule micro-fixtures
 (`tests/fixtures/<rule-id>/valid|invalid`). Nothing proves the engine stays
 **silent on a realistic clean application** — constitution §2's precision budget
 ("zero false positives on the good corpus") is written down but not enforced
@@ -159,25 +160,30 @@ pinned data. No committed fixture is needed beyond the corpus itself; the
 existing per-rule fixtures stay untouched.
 
 Deliberately authoring-sensitive points the tests will hold us to: the good app
-must dodge all 42 rules without contortions (that is the precision claim —
+must dodge all 41 rules without contortions (that is the precision claim —
 plain, idiomatic Nest code); the bad app's firing sites copy the `invalid/`
 fixture patterns of each rule into realistic files.
 
 ## Open questions for review
 
+Resolved at review (2026-09-22): all four recommendations accepted as written.
+
 1. **Corpus size — 2 apps or 3?** PLAN says "2–3 whole Nest applications
    good/bad". **Recommendation: 2** (`nest-good`, `nest-bad`). The probe check
    rides on the bad app; a third app would duplicate coverage without a
-   precision/recall question to answer.
+   precision/recall question to answer. — **Accepted.**
 2. **Coverage bar for the bad app.** **Recommendation: every registered rule
    fires at least once** across the corpus (AC-5). This makes the corpus a true
-   catalog and the golden test a regression fence for all 42 rules. The
+   catalog and the golden test a regression fence for all 41 rules. The
    cheaper alternative (a representative subset) weakens the gate; the fixture
    patterns for each rule already exist, so the cost is authoring time only.
+   — **Accepted.**
 3. **Prisma in the good app.** **Recommendation: yes** — the good app imports
    `@prisma/client` (a `PrismaService` with paginated queries), so the prisma
    pack's precision is also gated by the clean tree. Static only; no client is
    installed, no schema needed (import marker suffices for detection).
+   — **Accepted.**
 4. **Dedicated CI job for the gate?** The precision gate rides in `pnpm test`
    (already a CI step). **Recommendation: no separate workflow job** — same
    enforcement, boring pipeline. Can be added later without contract changes.
+   — **Accepted.**
