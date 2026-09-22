@@ -38,6 +38,19 @@ Under interop, a module **without** a default export exposes a *virtual*
 - Shebang: keep `#!/usr/bin/env node` in the bin **source**; a global `banner` would
   also stamp the library entry.
 - `external: ["jiti"]` — its loader machinery must run as the real dependency.
+- **Programmatic `build()` auto-loads `tsup.config.ts` unless told not to**
+  (bit spec 023): calling `build(options)` in-process (vitest `globalSetup`)
+  without `config: false` still reads the default config file and merges it
+  with the passed options. With an ARRAY config (`allBuildOptions`), that
+  merge pollutes `dist/`: every esm entry also emits an ESM-code `.cjs` twin
+  (`import`/`export` bytes under a `.cjs` name — unrequirable), and the cjs
+  hook entry gains a `.d.cts` even with `dts` unset. The CLI is immune, so
+  `pnpm test` and `pnpm build` silently produced different dist trees — and
+  would have produced different npm tarballs. The stale `dist/index.cjs`
+  observed across sessions was this, not a leftover manual build. Fix:
+  `build({ ...options, config: false, silent: true })` in
+  `tests/globalSetup.ts`; verified by dist listings and the spec 023
+  pack-pin test.
 
 ### ts-morph
 
