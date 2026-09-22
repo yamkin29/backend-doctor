@@ -1,6 +1,6 @@
 # Spec 023 — npm publish & README (F023)
 
-- **Status:** Draft — pending review
+- **Status:** Approved
 - **Phase:** 6 — Quality & release
 - **Depends on:** F001–F021 (all Done — the shipped surface: CLI, config,
   engine, 41 rules, GitHub Action, agent artifacts, runtime probe, combined
@@ -196,6 +196,15 @@ the docs (OQ-3) and the alias above — no new doc tooling.
 - No new `tests/fixtures/`; temp dirs only.
 
 ## Open questions for review
+
+All five were resolved on approval (2026-09-22) by adopting the
+recommendations: (1) the agent prepares and verifies everything; **the user
+runs the final `npm publish`**; (2) `dist/scripts/rule-docs.{js,d.ts}` are
+**excluded** from the tarball (`files` is an explicit list); (3) `docs/rules/**`
+**ship** in the tarball; (4) metadata coordinates name the post-rename
+`yamkin29/backend-doctor` (the user renames the GitHub repo at or before
+publish); (5) publish `0.1.0` as-is, LICENSE copyright "Copyright (c) 2026
+Aleksey Yamkin", `author` "Aleksey Yamkin".
 
 1. **Who executes the final `npm publish`?** (a) I do everything up to and
    including the tarball verification; **you** run `npm publish` from your
