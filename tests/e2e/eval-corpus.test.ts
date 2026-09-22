@@ -176,35 +176,33 @@ describe("e2e: eval corpus — coverage and jsonl (spec 022 AC-5, AC-6)", () => 
 });
 
 describe("e2e: eval corpus — probe (spec 022 AC-8)", () => {
-	it(
-		"attributes deliberate blocking to the bad app's worker script",
-		async () => {
-			const outDir = makeTmpDir();
-			const result = await runCliAsync(
-				["probe", "--out", outDir, "--", "node", "scripts/blocking.cjs"],
-				{ cwd: BAD_APP },
-			);
-			expect(result.exitCode, result.stderr).toBe(0);
+	it("attributes deliberate blocking to the bad app's worker script", {
+		timeout: 30000,
+	}, async () => {
+		const outDir = makeTmpDir();
+		const result = await runCliAsync(
+			["probe", "--out", outDir, "--", "node", "scripts/blocking.cjs"],
+			{ cwd: BAD_APP },
+		);
+		expect(result.exitCode, result.stderr).toBe(0);
 
-			const entries = fs.readdirSync(outDir);
-			expect(entries, "exactly one session directory").toHaveLength(1);
-			const sessionDir = path.join(outDir, entries[0] as string);
-			const findings = JSON.parse(
-				fs.readFileSync(path.join(sessionDir, "findings.json"), "utf8"),
-			) as {
-				blocking: {
-					count: number;
-					calls: Array<{ file: string; api: string }>;
-				};
+		const entries = fs.readdirSync(outDir);
+		expect(entries, "exactly one session directory").toHaveLength(1);
+		const sessionDir = path.join(outDir, entries[0] as string);
+		const findings = JSON.parse(
+			fs.readFileSync(path.join(sessionDir, "findings.json"), "utf8"),
+		) as {
+			blocking: {
+				count: number;
+				calls: Array<{ file: string; api: string }>;
 			};
-			expect(findings.blocking.count).toBeGreaterThanOrEqual(1);
-			// The culprit path is recorded relative to the probe cwd — the bad
-			// app's own worker, not a fixture copy.
-			expect(findings.blocking.calls[0]?.file).toBe("scripts/blocking.cjs");
+		};
+		expect(findings.blocking.count).toBeGreaterThanOrEqual(1);
+		// The culprit path is recorded relative to the probe cwd — the bad
+		// app's own worker, not a fixture copy.
+		expect(findings.blocking.calls[0]?.file).toBe("scripts/blocking.cjs");
 
-			// Storage went to --out: nothing may leak into the corpus tree.
-			expect(fs.existsSync(path.join(BAD_APP, ".backend-doctor"))).toBe(false);
-		},
-		{ timeout: 30000 },
-	);
+		// Storage went to --out: nothing may leak into the corpus tree.
+		expect(fs.existsSync(path.join(BAD_APP, ".backend-doctor"))).toBe(false);
+	});
 });

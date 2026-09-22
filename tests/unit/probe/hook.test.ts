@@ -188,40 +188,38 @@ test("collectors: attach carries the block, final lag flush precedes detach", ()
 	expect(events.indexOf(lag)).toBe(events.length - 2);
 });
 
-test(
-	"collectors: periodic non-final windows appear in long sessions",
-	() => {
-		const eventsPath = makeEventsPath();
-		const res = spawnHost(path.join(fixturesDir, "spin.cjs"), {
-			BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
-			BACKEND_DOCTOR_PROBE_COLLECTORS: JSON.stringify({
-				blockThresholdMs: 10,
-				lagIntervalMs: 300,
-				n1Threshold: 20,
-			}),
-		});
-		expect(res.status, res.statusMessage).toBe(0);
-		expect(res.stdout).toContain("spin-done");
+test("collectors: periodic non-final windows appear in long sessions", {
+	timeout: 15000,
+}, () => {
+	const eventsPath = makeEventsPath();
+	const res = spawnHost(path.join(fixturesDir, "spin.cjs"), {
+		BACKEND_DOCTOR_PROBE_EVENTS: eventsPath,
+		BACKEND_DOCTOR_PROBE_COLLECTORS: JSON.stringify({
+			blockThresholdMs: 10,
+			lagIntervalMs: 300,
+			n1Threshold: 20,
+		}),
+	});
+	expect(res.status, res.statusMessage).toBe(0);
+	expect(res.stdout).toContain("spin-done");
 
-		const events = parseEvents(eventsPath);
-		const windows = events.filter(
-			(event) => event.type === "loop.lag" && event.final === false,
-		);
-		expect(windows.length).toBeGreaterThanOrEqual(2);
-		for (const window of windows) {
-			expect(typeof window.periodMs).toBe("number");
-			// count may still be 0: monitorEventLoopDelay's sampling granularity
-			// does not guarantee a recorded sample per wall-clock window.
-			expect(typeof window.count).toBe("number");
-			expect(typeof window.p50Ms).toBe("number");
-		}
-		const finals = events.filter(
-			(event) => event.type === "loop.lag" && event.final === true,
-		);
-		expect(finals).toHaveLength(1);
-	},
-	{ timeout: 15000 },
-);
+	const events = parseEvents(eventsPath);
+	const windows = events.filter(
+		(event) => event.type === "loop.lag" && event.final === false,
+	);
+	expect(windows.length).toBeGreaterThanOrEqual(2);
+	for (const window of windows) {
+		expect(typeof window.periodMs).toBe("number");
+		// count may still be 0: monitorEventLoopDelay's sampling granularity
+		// does not guarantee a recorded sample per wall-clock window.
+		expect(typeof window.count).toBe("number");
+		expect(typeof window.p50Ms).toBe("number");
+	}
+	const finals = events.filter(
+		(event) => event.type === "loop.lag" && event.final === true,
+	);
+	expect(finals).toHaveLength(1);
+});
 
 test("malformed collectors JSON: one notice, lifecycle-only", () => {
 	const eventsPath = makeEventsPath();
