@@ -1,6 +1,6 @@
 # Spec 023 — npm publish & README (F023)
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Phase:** 6 — Quality & release
 - **Depends on:** F001–F021 (all Done — the shipped surface: CLI, config,
   engine, 41 rules, GitHub Action, agent artifacts, runtime probe, combined

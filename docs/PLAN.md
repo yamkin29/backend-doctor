@@ -85,7 +85,7 @@ projects[] }`.
 | F021 | Combined report (static + runtime) | 5 | Done |
 | — | Engine v2: ParserAdapter → oxc-parser | 5 (in-phase) | Planned |
 | F022 | Eval corpus & precision gate | 6 | Done |
-| F023 | npm publish & README | 6 | Planned |
+| F023 | npm publish & README | 6 | Done |
 
 ### Phase descriptions
 

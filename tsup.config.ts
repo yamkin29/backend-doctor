@@ -6,7 +6,7 @@ export const buildOptions: Options = {
 		"bin/backend-doctor": "src/bin/backend-doctor.ts",
 		index: "src/index.ts",
 		// Maintainer tooling for rule docs (spec 017), not part of the user
-		// CLI; whether it ships in the npm tarball is F023's decision.
+		// CLI and excluded from the npm tarball by spec 023's `files` list.
 		"scripts/rule-docs": "src/scripts/rule-docs.ts",
 	},
 	format: ["esm"],
