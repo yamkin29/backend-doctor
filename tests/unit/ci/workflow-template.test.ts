@@ -31,7 +31,10 @@ describe("renderWorkflowTemplate", () => {
 
 	it("checks out with full history for merge-base diffs", () => {
 		const yaml = renderWorkflowTemplate(DEFAULT_ACTION_REF);
-		expect(yaml).toContain("actions/checkout@v4");
+		// v5: the node24 runtime — v4 triggers GitHub's Node 20 deprecation
+		// annotations in every generated user workflow.
+		expect(yaml).toContain("actions/checkout@v5");
+		expect(yaml).not.toContain("actions/checkout@v4");
 		expect(yaml).toContain("fetch-depth: 0");
 	});
 

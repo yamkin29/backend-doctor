@@ -36,7 +36,9 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/setup-node@v4
+    # v5: node24 runtime — v4 triggers GitHub's Node 20 deprecation
+    # annotations in every user workflow that consumes this action.
+    - uses: actions/setup-node@v5
       with:
         node-version: 22
 
