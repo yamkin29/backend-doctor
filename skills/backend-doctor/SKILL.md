@@ -20,13 +20,13 @@ before you call the change done.
 After edits — scan only what changed:
 
 ```sh
-npx backend-doctor@latest scan --scope changed --format jsonl
+npx backend-doctor-cli@latest scan --scope changed --format jsonl
 ```
 
 For a whole-repository audit (onboarding, pre-refactor inventory):
 
 ```sh
-npx backend-doctor@latest scan --format jsonl
+npx backend-doctor-cli@latest scan --format jsonl
 ```
 
 Notes:
@@ -66,19 +66,19 @@ configuration problem (check flags and config; do not retry blindly).
    repository (https://github.com/yamkin29/Node-doctor), or run:
 
 ```sh
-npx backend-doctor@latest rules explain backend-doctor/no-eval
+npx backend-doctor-cli@latest rules explain backend-doctor/no-eval
 ```
 
 3. To browse everything the tool checks, run:
 
 ```sh
-npx backend-doctor@latest rules list
+npx backend-doctor-cli@latest rules list
 ```
 
 ## Silencing a rule (deliberately)
 
 ```ts
-import { defineConfig } from "backend-doctor";
+import { defineConfig } from "backend-doctor-cli";
 
 export default defineConfig({
 	rules: {

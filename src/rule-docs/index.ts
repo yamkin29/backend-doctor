@@ -168,7 +168,7 @@ TODO: why this matters in backend services. Precision over recall
 ## Configuration
 
 \`\`\`ts
-import { defineConfig } from "backend-doctor";
+import { defineConfig } from "backend-doctor-cli";
 
 export default defineConfig({
 	rules: {

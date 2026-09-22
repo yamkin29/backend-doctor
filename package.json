@@ -1,5 +1,5 @@
 {
-	"name": "backend-doctor",
+	"name": "backend-doctor-cli",
 	"version": "0.1.0",
 	"description": "Deterministic static analyzer for Node.js/NestJS backends.",
 	"type": "module",

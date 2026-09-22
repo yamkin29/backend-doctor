@@ -6,9 +6,10 @@ import { describe, expect, it } from "vitest";
 /**
  * Spec 023: the publish-relevant contract of `package.json`, pinned exactly.
  * These fields are consumed by the npm registry, the composite action's
- * `npm install -g backend-doctor@<version>` path and the maintainer workflows;
- * a silent drift in any of them changes what users download or run, so the
- * expected values are spelled out in full rather than spot-checked.
+ * `npm install -g backend-doctor-cli@<version>` path and the maintainer
+ * workflows; a silent drift in any of them changes what users download or
+ * run, so the expected values are spelled out in full rather than
+ * spot-checked.
  */
 
 const repoRoot = path.resolve(
@@ -17,6 +18,7 @@ const repoRoot = path.resolve(
 );
 
 interface PackageJson {
+	name?: string;
 	scripts?: Record<string, string>;
 	bin?: Record<string, string>;
 	author?: string;
@@ -30,6 +32,14 @@ interface PackageJson {
 const pkg = JSON.parse(fs.readFileSync(repoRoot, "utf8")) as PackageJson;
 
 describe("package.json publish contract (spec 023)", () => {
+	it("pins the npm package name", () => {
+		// The CLI/product identity stays "backend-doctor" (bin command, config
+		// file, rule-id prefix); the npm package is suffixed -cli because the
+		// unsuffixed name is blocked by npm's typosquatting rule (it
+		// normalizes to the taken "backenddoctor").
+		expect(pkg.name).toBe("backend-doctor-cli");
+	});
+
 	it("pins the CLI entry point in npm's canonical bin spelling", () => {
 		// No "./" prefix: npm 11's publish normalization rewrites bin targets to
 		// paths it considers valid and warns "invalid and removed" otherwise.

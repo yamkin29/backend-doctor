@@ -44,7 +44,7 @@ runs:
 
     - name: Install backend-doctor
       shell: bash
-      run: npm install -g "backend-doctor@${{ inputs.version }}"
+      run: npm install -g "backend-doctor-cli@${{ inputs.version }}"
 
     - name: Scan changed lines
       shell: bash

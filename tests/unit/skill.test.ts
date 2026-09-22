@@ -78,7 +78,7 @@ function invocations(content: string): string[] {
 		.map((line) => line.trim())
 		.filter(
 			(line) =>
-				line.startsWith("npx backend-doctor@latest ") ||
+				line.startsWith("npx backend-doctor-cli@latest ") ||
 				line.startsWith("backend-doctor "),
 		);
 }
@@ -100,7 +100,7 @@ describe("skills/backend-doctor/SKILL.md (spec 017 AC-6)", () => {
 
 		for (const invocation of shown) {
 			const rest = invocation
-				.replace(/^npx backend-doctor@latest /, "")
+				.replace(/^npx backend-doctor-cli@latest /, "")
 				.replace(/^backend-doctor /, "");
 			const tokens = rest.split(/\s+/);
 			const command = tokens[0] ?? "";
@@ -134,7 +134,7 @@ describe("skills/backend-doctor/SKILL.md (spec 017 AC-6)", () => {
 	it("teaches the adopted changed-scope jsonl flow first", () => {
 		const content = readSkill();
 		expect(content).toContain(
-			"npx backend-doctor@latest scan --scope changed --format jsonl",
+			"npx backend-doctor-cli@latest scan --scope changed --format jsonl",
 		);
 		expect(content.indexOf("scan --scope changed")).toBeLessThan(
 			content.indexOf("scan --format jsonl"),

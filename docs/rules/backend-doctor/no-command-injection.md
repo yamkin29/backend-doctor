@@ -76,7 +76,7 @@ detected in v1 (spec 007 open question 5) — revisit after the eval corpus
 ## Configuration
 
 ```ts
-import { defineConfig } from "backend-doctor";
+import { defineConfig } from "backend-doctor-cli";
 
 export default defineConfig({
 	rules: {

@@ -80,7 +80,7 @@ the Nest app model (F008), graph rules (F013) and runtime attribution
 ## Configuration
 
 ```ts
-import { defineConfig } from "backend-doctor";
+import { defineConfig } from "backend-doctor-cli";
 
 export default defineConfig({
 	rules: {

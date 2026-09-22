@@ -40,6 +40,19 @@ verification, close-out last.
 
 ## Deviations & notes
 
+- **npm package renamed to `backend-doctor-cli`** (user decision in chat,
+  2026-09-22): the first publish attempt got 403 — npm's typosquatting rule
+  normalizes names without hyphens, and `backenddoctor` (dead one-file
+  package from 2022) blocks `backend-doctor`. The product identity is
+  unchanged (bin command `backend-doctor`, `backend-doctor.config.ts`,
+  `.backend-doctor/` storage, rule-id prefix `backend-doctor/*`, SKILL front
+  matter); only npm-install surfaces changed: `package.json` name, the
+  `npx backend-doctor-cli@latest` invocations in README and SKILL.md (+ the
+  spec 017 guard test), the action's `npm install -g backend-doctor-cli@…`,
+  and `import { defineConfig } from "backend-doctor-cli"` in the JSDoc, the
+  docs scaffold and all 41 rule docs. `docs/PLAN.md` Decisions amended.
+  Note: `npm view` returning 404 does NOT mean a name is publishable — the
+  similarity check runs server-side at PUT only.
 - **tsup programmatic `build()` auto-loads `tsup.config.ts`** (found during
   T4): `tests/globalSetup.ts` called `build({ ...options })` without
   `config: false`, so tsup merged the ARRAY config from the file into the

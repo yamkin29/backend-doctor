@@ -17,7 +17,7 @@ architecture drift.
 ## Quick start
 
 ```sh
-npx backend-doctor@latest scan
+npx backend-doctor-cli@latest scan
 ```
 
 That scans the current directory and prints a pretty report. Exit code `0`
@@ -27,8 +27,8 @@ configuration problem (bad flag, unreadable config) — not a crash.
 For machine-readable output:
 
 ```sh
-npx backend-doctor@latest scan --format json    # one schemaVersion-1 document
-npx backend-doctor@latest scan --format jsonl   # one JSON object per finding
+npx backend-doctor-cli@latest scan --format json    # one schemaVersion-1 document
+npx backend-doctor-cli@latest scan --format jsonl   # one JSON object per finding
 ```
 
 Useful scan flags:
@@ -64,9 +64,9 @@ export default {
 };
 ```
 
-Create a starter file with `npx backend-doctor@latest init`. CLI flags
+Create a starter file with `npx backend-doctor-cli@latest init`. CLI flags
 override config. Inspect what actually resolved with
-`npx backend-doctor@latest scan --dump-config`.
+`npx backend-doctor-cli@latest scan --dump-config`.
 
 ## Rules
 
@@ -76,8 +76,8 @@ correctness, event-loop blocking, Node security, Nest DI and layering, DTO
 shape, Prisma usage, project-graph hygiene and config/env handling.
 
 ```sh
-npx backend-doctor@latest rules list          # every registered rule
-npx backend-doctor@latest rules explain backend-doctor/no-eval
+npx backend-doctor-cli@latest rules list          # every registered rule
+npx backend-doctor-cli@latest rules explain backend-doctor/no-eval
 ```
 
 Every rule has a markdown doc under `docs/rules/backend-doctor/<rule>.md` —
@@ -90,7 +90,7 @@ detected in the scanned project.
 ## CI (GitHub Actions)
 
 ```sh
-npx backend-doctor@latest ci install
+npx backend-doctor-cli@latest ci install
 ```
 
 writes a workflow that scans pull requests and posts a sticky PR comment,
@@ -105,14 +105,14 @@ blocking calls with file:line attribution, HTTP endpoint latencies, database
 query counts and memory/GC signals:
 
 ```sh
-npx backend-doctor@latest probe -- npm start
-npx backend-doctor@latest probe --duration 60 -- node dist/main.js
+npx backend-doctor-cli@latest probe -- npm start
+npx backend-doctor-cli@latest probe --duration 60 -- node dist/main.js
 ```
 
 Sessions land in `./.backend-doctor/probe/`. Merge them into a static scan:
 
 ```sh
-npx backend-doctor@latest scan --trace .backend-doctor/probe/<session>
+npx backend-doctor-cli@latest scan --trace .backend-doctor/probe/<session>
 ```
 
 Traces contain URLs and filesystem paths — they are treated as sensitive and
@@ -124,7 +124,7 @@ are never sent anywhere.
 backend edits:
 
 ```sh
-npx backend-doctor@latest scan --scope changed --format jsonl
+npx backend-doctor-cli@latest scan --scope changed --format jsonl
 ```
 
 Each jsonl line is one finding with a deterministic `id` (stable across runs),

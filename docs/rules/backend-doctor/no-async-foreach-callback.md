@@ -52,7 +52,7 @@ await Promise.all(items.map((item) => save(item)));
 ## Configuration
 
 ```ts
-import { defineConfig } from "backend-doctor";
+import { defineConfig } from "backend-doctor-cli";
 
 export default defineConfig({
 	rules: {

@@ -11,8 +11,13 @@ follow **TDD** (red → green → refactor).
 
 ## 1. Decisions
 
-- **Name/package:** `backend-doctor` (npm name is free; repo folder stays `Node-doctor`).
-  `node-doctor` and `nest-doctor` are already taken on npm.
+- **Name/package:** npm package is `backend-doctor-cli`; the product identity
+  (CLI command, `backend-doctor.config.ts`, `.backend-doctor/` storage,
+  rule-id prefix `backend-doctor/*`) stays `backend-doctor`. History: the
+  original decision was `backend-doctor`, but at first publish (2026-09-22)
+  npm's typosquatting rule rejected it — names normalize without hyphens and
+  `backenddoctor` has existed since 2022. The user chose the `-cli` suffix;
+  `node-doctor`, `nest-doctor`, and `backenddoctor` are taken on npm.
 - **Engine:** ts-morph (TS compiler API) hidden behind a `ParserAdapter` interface;
   Engine v2 migrates the adapter to oxc-parser (the react-doctor stack) without
   rewriting rules.

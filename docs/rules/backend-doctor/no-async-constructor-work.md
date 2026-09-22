@@ -64,7 +64,7 @@ class App {
 ## Configuration
 
 ```ts
-import { defineConfig } from "backend-doctor";
+import { defineConfig } from "backend-doctor-cli";
 
 export default defineConfig({
 	rules: {

@@ -4,7 +4,7 @@ import type { UserConfig } from "./config/types.js";
  * Identity helper giving user configs full type checking:
  *
  * ```ts
- * import { defineConfig } from "backend-doctor";
+ * import { defineConfig } from "backend-doctor-cli";
  * export default defineConfig({ rules: {} });
  * ```
  */
