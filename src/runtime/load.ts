@@ -11,8 +11,6 @@ import path from "node:path";
 import type { RuntimeProvenance } from "../core/types.js";
 import type { FindingsDocument, TRACE_SCHEMA_VERSION } from "../probe/types.js";
 
-const FINDINGS_VERSION = 1;
-
 export interface LoadedTrace {
 	findings: FindingsDocument;
 	/** Absolute path of the parsed findings.json. */
