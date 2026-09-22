@@ -18,6 +18,7 @@ const repoRoot = path.resolve(
 
 interface PackageJson {
 	scripts?: Record<string, string>;
+	bin?: Record<string, string>;
 	author?: string;
 	repository?: { type: string; url: string };
 	homepage?: string;
@@ -29,6 +30,14 @@ interface PackageJson {
 const pkg = JSON.parse(fs.readFileSync(repoRoot, "utf8")) as PackageJson;
 
 describe("package.json publish contract (spec 023)", () => {
+	it("pins the CLI entry point in npm's canonical bin spelling", () => {
+		// No "./" prefix: npm 11's publish normalization rewrites bin targets to
+		// paths it considers valid and warns "invalid and removed" otherwise.
+		expect(pkg.bin).toEqual({
+			"backend-doctor": "dist/bin/backend-doctor.js",
+		});
+	});
+
 	it("pins the publish gate and the rule-docs alias scripts", () => {
 		expect(pkg.scripts?.prepublishOnly).toBe(
 			"pnpm lint && pnpm typecheck && pnpm test && pnpm build",

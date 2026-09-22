@@ -26,7 +26,7 @@
 		"node": ">=20"
 	},
 	"bin": {
-		"backend-doctor": "./dist/bin/backend-doctor.js"
+		"backend-doctor": "dist/bin/backend-doctor.js"
 	},
 	"exports": {
 		".": {
