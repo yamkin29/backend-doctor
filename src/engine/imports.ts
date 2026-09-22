@@ -48,9 +48,21 @@ const EXTENSION_SWAPS: ReadonlyMap<string, string> = new Map([
 
 const SUPPORTED: readonly string[] = [".ts", ".tsx", ".mts", ".cts"];
 
+/**
+ * Extensions that end a specifier's stem. Anything else (`""`, but also
+ * Nest-idiomatic dotted stems like `./app.module` or `./users.service.dto`)
+ * means the dot belongs to the name, so the supported suffixes apply.
+ */
+const KNOWN_EXTENSIONS: ReadonlySet<string> = new Set([
+	...SUPPORTED,
+	".js",
+	".mjs",
+	".cjs",
+]);
+
 function candidatePaths(base: string): string[] {
 	const extension = path.extname(base);
-	if (extension === "") {
+	if (!KNOWN_EXTENSIONS.has(extension)) {
 		return [...SUPPORTED, ...SUPPORTED.map((ext) => `/index${ext}`)].map(
 			(suffix) => (suffix.startsWith("/") ? `${base}${suffix}` : base + suffix),
 		);

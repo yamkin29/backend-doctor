@@ -85,6 +85,22 @@ describe("buildImportGraph — edge resolution", () => {
 		]);
 	});
 
+	it("resolves Nest-idiomatic dotted stems by appending supported extensions", () => {
+		// "./app.module" carries a dot, but ".module" is part of the stem, not
+		// an extension — the F022 good corpus died on exactly this shape.
+		const graph = buildImportGraph(
+			project({
+				"main.ts": ["./app.module", "./users/users.service", "./data.json"],
+				"app.module.ts": [],
+				"users/users.service.ts": [],
+			}),
+		);
+		expect(graph.edgesOf("/proj/src/main.ts")).toEqual([
+			"/proj/src/app.module.ts",
+			"/proj/src/users/users.service.ts",
+		]);
+	});
+
 	it("drops bare specifiers, unresolvable paths and self-edges", () => {
 		const graph = buildImportGraph(
 			project({
