@@ -35,7 +35,11 @@
 		}
 	},
 	"files": [
-		"dist"
+		"dist/bin",
+		"dist/index.js",
+		"dist/index.d.ts",
+		"dist/probe",
+		"docs/rules"
 	],
 	"scripts": {
 		"build": "tsup",
