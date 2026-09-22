@@ -219,9 +219,21 @@ Under interop, a module **without** a default export exposes a *virtual*
   must try, in order: the literal path; `.js→.ts`, `.mjs→.mts`,
   `.cjs→.cts`; both forms with `/index` appended. Bare specifiers are
   package imports, never graph edges.
+- **`path.extname` lies about Nest-idiomatic stems (bit spec 022).**
+  `./app.module`, `./users.service.dto` carry dots that are part of the
+  name, not an extension — `path.extname` returns `.module`/`.dto`, and a
+  resolver that appends candidates only for the *empty* extension silently
+  kills every edge in a clean Nest app (the F022 good corpus produced 23
+  unused-file/unused-export false positives before the fix). Decide by a
+  known-extension set (`.ts/.tsx/.mts/.cts/.js/.mjs/.cjs`): in the set →
+  swap logic; anything else → append supported suffixes. See
+  `candidatePaths` in `src/engine/imports.ts`.
 - Re-exports (`export … from`) and computed specifiers
   (`` import(`./x/${name}`) ``) are not edges in the adapter's
   `getModuleSpecifiers()` — documented recall hole for the graph pack.
+- `circular-dependency` reports one finding per cycle *member* (a mutual
+  pair yields 2 diagnostics), while `circular-di` reports once per cycle at
+  the canonical provider — the two rule kinds intentionally differ.
 
 ### ts-morph v28 (spec 013 additions)
 

@@ -1,6 +1,6 @@
 # Spec 022 — Eval corpus & precision gate (F022)
 
-- **Status:** Approved (2026-09-22 — all open-question recommendations accepted)
+- **Status:** Implemented (2026-09-22)
 - **Phase:** 6 — Quality & release
 - **Depends on:** F001–F021 (all Done) — the corpus exercises the full shipped
   surface: 36 AST rules, 6 project rules, framework detection, reporters, probe.
