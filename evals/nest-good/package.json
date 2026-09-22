@@ -1,0 +1,17 @@
+{
+	"name": "nest-good",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Eval corpus: clean Nest application — the precision budget (F022).",
+	"scripts": {
+		"start": "node dist/main.js"
+	},
+	"dependencies": {
+		"@nestjs/common": "^10.0.0",
+		"@nestjs/core": "^10.0.0",
+		"@prisma/client": "^5.19.0",
+		"class-validator": "^0.14.1",
+		"reflect-metadata": "^0.2.2",
+		"zod": "^3.23.8"
+	}
+}

@@ -1,0 +1,16 @@
+{
+	"name": "nest-bad",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Eval corpus: dirty Nest application — one firing site per rule (F022).",
+	"scripts": {
+		"start": "node dist/main.js"
+	},
+	"dependencies": {
+		"@nestjs/common": "^10.0.0",
+		"@nestjs/core": "^10.0.0",
+		"@prisma/client": "^5.19.0",
+		"moment": "^2.30.1",
+		"reflect-metadata": "^0.2.2"
+	}
+}
