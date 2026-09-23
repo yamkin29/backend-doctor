@@ -1,6 +1,6 @@
 # Spec 024 — Agent skill installer (`backend-doctor install`) (F024)
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Phase:** 4 — Integrations
 - **Depends on:** F017 (Done — the `skills/backend-doctor/SKILL.md` artifact and
   its guard test); F023 (Done — the skill ships inside the npm package since

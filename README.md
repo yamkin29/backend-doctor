@@ -123,10 +123,20 @@ are never sent anywhere.
 ## For coding agents
 
 The package ships an agent skill — a small instruction file that teaches
-coding agents supporting the Agent Skills format (Claude Code and others) to
-run a scoped scan after backend edits and read the findings correctly.
+coding agents supporting the Agent Skills format to run a scoped scan after
+backend edits and read the findings correctly. One command installs it:
 
-Install the skill into your agent's skills directory:
+```sh
+npx backend-doctor-cli@latest install
+```
+
+With no flags that prints a detection report and writes nothing. Pick the
+target explicitly — `--agent claude-code` (also read by Cursor and VS Code)
+or `--agent codex`; `--scope project` writes into the current repo (default),
+`--scope global` into your home directory. Re-running after an upgrade
+reports "Up to date" or refuses with `--force` as the overwrite escape hatch.
+
+Prefer to wire the skill by hand? It ships in the package:
 
 ```sh
 npm install --no-save backend-doctor-cli
@@ -134,9 +144,7 @@ mkdir -p ~/.claude/skills
 cp -r node_modules/backend-doctor-cli/skills/backend-doctor ~/.claude/skills/
 ```
 
-The example paths are Claude Code's; other agents use an equivalent skills
-folder — check your agent's documentation. Or run an ad-hoc scan without
-installing the skill:
+Or run an ad-hoc scan without installing the skill:
 
 ```sh
 npx backend-doctor-cli@latest scan --scope changed --format jsonl

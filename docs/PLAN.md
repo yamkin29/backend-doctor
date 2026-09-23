@@ -91,7 +91,7 @@ projects[] }`.
 | — | Engine v2: ParserAdapter → oxc-parser | 5 (in-phase) | Planned |
 | F022 | Eval corpus & precision gate | 6 | Done |
 | F023 | npm publish & README | 6 | Done |
-| F024 | Agent skill installer (`backend-doctor install`) | 4 | Draft spec |
+| F024 | Agent skill installer (`backend-doctor install`) | 4 | Done |
 
 ### Phase descriptions
 
