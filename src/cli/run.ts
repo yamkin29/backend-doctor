@@ -7,6 +7,10 @@ import {
 	ciReportCommand,
 } from "./commands/ci.js";
 import { initCommand } from "./commands/init.js";
+import {
+	type InstallCommandOptions,
+	installCommand,
+} from "./commands/install.js";
 import { type ProbeCommandOptions, probeCommand } from "./commands/probe.js";
 import { rulesExplainCommand, rulesListCommand } from "./commands/rules.js";
 import { type ScanCommandOptions, scanCommand } from "./commands/scan.js";
@@ -117,6 +121,31 @@ export async function run(argv: string[]): Promise<number> {
 		.exitOverride()
 		.action(async () => {
 			exit = initCommand();
+		});
+
+	program
+		.command("install")
+		.description(
+			"Install the agent skill into Agent Skills-aware agents (Claude Code, Codex; Cursor and VS Code read the same directories). Without flags: detection report, no writes.",
+		)
+		.addOption(
+			new Option("--agent <agent>", "target agent id").choices([
+				"claude-code",
+				"codex",
+			]),
+		)
+		.addOption(
+			new Option(
+				"--scope <scope>",
+				"project (cwd) or global (home) skills directory",
+			)
+				.choices(["project", "global"])
+				.default("project"),
+		)
+		.option("--force", "overwrite a drifted skill directory")
+		.exitOverride()
+		.action((opts: InstallCommandOptions) => {
+			exit = installCommand(opts);
 		});
 
 	const rules = program
