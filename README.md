@@ -120,8 +120,21 @@ are never sent anywhere.
 
 ## For coding agents
 
-`skills/backend-doctor/SKILL.md` teaches agents to run a scoped scan after
-backend edits:
+The package ships an agent skill — a small instruction file that teaches
+coding agents supporting the Agent Skills format (Claude Code and others) to
+run a scoped scan after backend edits and read the findings correctly.
+
+Install the skill into your agent's skills directory:
+
+```sh
+npm install --no-save backend-doctor-cli
+mkdir -p ~/.claude/skills
+cp -r node_modules/backend-doctor-cli/skills/backend-doctor ~/.claude/skills/
+```
+
+The example paths are Claude Code's; other agents use an equivalent skills
+folder — check your agent's documentation. Or run an ad-hoc scan without
+installing the skill:
 
 ```sh
 npx backend-doctor-cli@latest scan --scope changed --format jsonl

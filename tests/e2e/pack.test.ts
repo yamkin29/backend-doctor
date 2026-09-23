@@ -66,6 +66,7 @@ const PINNED_TARBALL_FILES = [
 	"docs/rules/backend-doctor/unused-export.md",
 	"docs/rules/backend-doctor/unused-file.md",
 	"package.json",
+	"skills/backend-doctor/SKILL.md",
 ];
 
 describe("npm tarball contents (spec 023 AC-1)", () => {

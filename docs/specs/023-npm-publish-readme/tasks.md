@@ -40,6 +40,16 @@ verification, close-out last.
 
 ## Deviations & notes
 
+- **0.1.1 — the agent skill now ships in the package** (post-close-out
+  addition, user decision in chat 2026-09-23): `files` gained `skills`, the
+  pack pin gained `skills/backend-doctor/SKILL.md`, and the README's "For
+  coding agents" section now gives concrete install steps
+  (`npm install --no-save backend-doctor-cli` + copy into the agent's skills
+  directory) instead of referencing a repo-only path. Motivation: the
+  repository is private, so the published package is the only public home
+  for the skill. Version bumped to 0.1.1 (0.1.0 is already on the registry).
+  Verified live: the README recipe installs the skill byte-identical to the
+  repo copy.
 - **npm package renamed to `backend-doctor-cli`** (user decision in chat,
   2026-09-22): the first publish attempt got 403 — npm's typosquatting rule
   normalizes names without hyphens, and `backenddoctor` (dead one-file
