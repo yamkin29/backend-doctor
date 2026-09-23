@@ -1,5 +1,7 @@
 # backend-doctor
 
+[![CI](https://github.com/yamkin29/backend-doctor/actions/workflows/ci.yml/badge.svg)](https://github.com/yamkin29/backend-doctor/actions/workflows/ci.yml)
+
 A deterministic static analyzer for Node.js and NestJS backends. It reads your
 TypeScript — controllers, providers, services, repositories, Prisma queries,
 configuration — and reports what will bite in production: floating promises,
@@ -154,6 +156,10 @@ pnpm lint        # biome
 pnpm build       # tsup → dist/
 pnpm docs:rules  # rule-docs ↔ registry drift check
 ```
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+setup, the rule-authoring guide and the project's working rules. Every
+shipped feature has its design history in [docs/specs/](docs/specs/).
 
 ## License
 
