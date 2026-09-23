@@ -1,6 +1,6 @@
 # Spec 024 — Agent skill installer (`backend-doctor install`) (F024)
 
-- **Status:** Draft — pending review
+- **Status:** Approved
 - **Phase:** 4 — Integrations
 - **Depends on:** F017 (Done — the `skills/backend-doctor/SKILL.md` artifact and
   its guard test); F023 (Done — the skill ships inside the npm package since
@@ -155,6 +155,12 @@ backend-doctor install [--agent <claude-code|codex>] [--scope <project|global>] 
   section executed verbatim; outputs recorded in `tasks.md`.
 
 ## Open questions for review
+
+All four were resolved on approval (2026-09-23) by adopting the
+recommendations: (1) default scope `project` (explicit `--scope` always
+wins); (2) no-flag behavior is the detection report only — zero writes;
+(3) targets v1 are `claude-code` + `codex`; (4) drift refuses with exit 2
+unless `--force`.
 
 1. **Default scope when `--agent` is given:** (a) `project` — writes into the
    current repo so the team shares it via VCS, mirrors `init`/`ci install`
