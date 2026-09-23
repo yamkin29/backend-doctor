@@ -72,6 +72,13 @@ verification, close-out last.
 
 ## T5 — recorded outputs (2026-09-22)
 
+- **AC-5 — verified on the registry (2026-09-23, after the user's publish):**
+  `npm view backend-doctor-cli` → version `0.1.0`, license `MIT`, repository
+  `git+https://github.com/yamkin29/backend-doctor.git`, homepage
+  `…#readme`, description intact; `npx -y backend-doctor-cli@latest scan
+  evals/nest-good --format json` → one `schemaVersion: 1` document with
+  `diagnostics: []`, exit 0; `npx backend-doctor-cli@latest --version` →
+  `0.1.0`. Spec 023 is fully Implemented; the feature is closed.
 - **prepublishOnly chain, verbatim:** `pnpm lint && pnpm typecheck && pnpm
   test && pnpm build` → exit 0. lint: 1 pre-existing warning
   (`src/runtime/load.ts:14` unused `FINDINGS_VERSION`, out of scope);
