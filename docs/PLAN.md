@@ -91,6 +91,7 @@ projects[] }`.
 | — | Engine v2: ParserAdapter → oxc-parser | 5 (in-phase) | Planned |
 | F022 | Eval corpus & precision gate | 6 | Done |
 | F023 | npm publish & README | 6 | Done |
+| F024 | Agent skill installer (`backend-doctor install`) | 4 | Draft spec |
 
 ### Phase descriptions
 
@@ -147,6 +148,10 @@ projects[] }`.
   `blocking: none` by default.
 - **F017 Agent integration** — `skills/backend-doctor/SKILL.md`, markdown rule docs
   generation (`docs/rules/{id}.md`), `rules list/explain`, stable `--format jsonl`.
+- **F024 Agent skill installer** — `backend-doctor install` copies the shipped
+  skill into the conventions of Agent Skills-aware agents (Claude Code, Codex;
+  Cursor and VS Code read the same directories), with detection, idempotent
+  no-op on identical content and `--force` on drift.
 
 **Phase 5 — Runtime engine (react-doctor parity)**
 Mandatory phase: the analog of `react-doctor scan <url>`, but for a Node process.
