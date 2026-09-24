@@ -1,7 +1,7 @@
-name: "backend-doctor"
+name: "Backend Doctor — Node.js/NestJS Static Analyzer"
 description: >-
-  Deterministic static analyzer for Node.js/NestJS backends — advisory PR
-  surfaces (sticky summary, inline review comments, commit status).
+  Deterministic static analyzer for Node.js/NestJS backends: async bugs,
+  event-loop blocking, security, DI, Prisma.
 
 inputs:
   blocking:
