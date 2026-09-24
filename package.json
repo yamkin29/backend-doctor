@@ -20,7 +20,13 @@
 		"static-analysis",
 		"lint",
 		"prisma",
-		"code-quality"
+		"code-quality",
+		"github-action",
+		"code-review",
+		"typescript",
+		"security",
+		"event-loop",
+		"async"
 	],
 	"engines": {
 		"node": ">=20"

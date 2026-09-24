@@ -1,6 +1,9 @@
 # backend-doctor
 
 [![CI](https://github.com/yamkin29/backend-doctor/actions/workflows/ci.yml/badge.svg)](https://github.com/yamkin29/backend-doctor/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/backend-doctor-cli)](https://www.npmjs.com/package/backend-doctor-cli)
+[![npm downloads](https://img.shields.io/npm/dm/backend-doctor-cli)](https://www.npmjs.com/package/backend-doctor-cli)
+[![GitHub Marketplace](https://img.shields.io/badge/GitHub-Marketplace-blue?logo=github)](https://github.com/marketplace/actions/backend-doctor-node-js-nestjs-static-analyzer)
 
 A deterministic static analyzer for Node.js and NestJS backends. It reads your
 TypeScript — controllers, providers, services, repositories, Prisma queries,
@@ -91,13 +94,40 @@ detected in the scanned project.
 
 ## CI (GitHub Actions)
 
+Add one step to any pull-request workflow — it posts a sticky PR summary,
+inline review comments on the changed lines and a commit status. Blocking is
+opt-in (`blocking: none` by default — findings are reported, not failed):
+
+```yaml
+name: Backend Doctor
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  backend-doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: yamkin29/backend-doctor@v1
+```
+
+Listed in the
+[GitHub Marketplace](https://github.com/marketplace/actions/backend-doctor-node-js-nestjs-static-analyzer).
+Prefer a generated file? `ci install` writes exactly this workflow for you:
+
 ```sh
 npx backend-doctor-cli@latest ci install
 ```
-
-writes a workflow that scans pull requests and posts a sticky PR comment,
-inline review comments and a commit status via `ci report`. Blocking is opt-in
-(`blocking: none` by default — findings are reported, not failed).
 
 ## Runtime probe
 

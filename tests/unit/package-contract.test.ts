@@ -79,6 +79,14 @@ describe("package.json publish contract (spec 023)", () => {
 			"lint",
 			"prisma",
 			"code-quality",
+			// Discoverability set (npm search + GitHub topics parity), added with
+			// the Marketplace listing: action/review/type-check angles.
+			"github-action",
+			"code-review",
+			"typescript",
+			"security",
+			"event-loop",
+			"async",
 		]);
 	});
 });
