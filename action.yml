@@ -2,6 +2,9 @@ name: "Backend Doctor — Node.js/NestJS Static Analyzer"
 description: >-
   Deterministic static analyzer for Node.js/NestJS backends: async bugs,
   event-loop blocking, security, DI, Prisma.
+branding:
+  icon: "activity"
+  color: "green"
 
 inputs:
   blocking:
