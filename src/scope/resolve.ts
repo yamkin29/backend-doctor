@@ -36,6 +36,10 @@ const GIT_MISSING =
 export async function resolveScope(
 	request: ScopeRequest,
 ): Promise<ScopeResolution> {
+	const missingGit =
+		request.mode === "introduced"
+			? "git is not available on PATH (required for --scope introduced)"
+			: GIT_MISSING;
 	if (request.mode === "files") {
 		return {
 			ok: true,
@@ -69,7 +73,7 @@ export async function resolveScope(
 			ok: false,
 			error:
 				toplevel.kind === "missing-git"
-					? GIT_MISSING
+					? missingGit
 					: `not inside a git work tree: ${request.target}`,
 		};
 	}
@@ -113,7 +117,7 @@ export async function resolveScope(
 					ok: false,
 					error:
 						changed.kind === "missing-git"
-							? GIT_MISSING
+							? missingGit
 							: `git diff --name-only failed: ${changed.detail}`,
 				};
 			}
@@ -130,6 +134,18 @@ export async function resolveScope(
 		};
 	}
 
+	// Introduced scope has an empty baseline before the first commit, including
+	// files already staged in the index (which ls-files --others excludes).
+	if (request.mode === "introduced" && mergeBase === undefined) {
+		const indexed = await runGit(top, ["ls-files", "--cached", "-z"]);
+		if (!indexed.ok)
+			return {
+				ok: false,
+				error: "Cannot list staged files for an empty baseline",
+			};
+		tracked = nulFields(indexed.stdout);
+	}
+
 	const untracked = await runGit(top, [
 		"ls-files",
 		"--others",
@@ -141,7 +157,7 @@ export async function resolveScope(
 			ok: false,
 			error:
 				untracked.kind === "missing-git"
-					? GIT_MISSING
+					? missingGit
 					: `git ls-files failed: ${untracked.detail}`,
 		};
 	}
@@ -169,7 +185,7 @@ export async function resolveScope(
 					ok: false,
 					error:
 						diff.kind === "missing-git"
-							? GIT_MISSING
+							? missingGit
 							: `git diff -U0 failed for ${rel}: ${diff.detail}`,
 				};
 			}
@@ -190,6 +206,9 @@ export async function resolveScope(
 			files: new Set(files),
 			lineRanges,
 			base: request.base,
+			...(request.mode === "introduced"
+				? { repositoryRoot: top, baselineCommit: mergeBase }
+				: {}),
 		},
 	};
 }

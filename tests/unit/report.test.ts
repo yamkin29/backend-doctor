@@ -74,7 +74,7 @@ describe("buildReport — scope (spec 015)", () => {
 		expect(doc.mode).toBe("files");
 	});
 
-	it("carries scope.base only for changed and lines scopes", () => {
+	it("carries scope.base for Git comparison scopes", () => {
 		const changed = buildReport(
 			scopedResultWith(scopeWithMode("changed", "main")),
 		);
@@ -84,6 +84,11 @@ describe("buildReport — scope (spec 015)", () => {
 		const lines = buildReport(scopedResultWith(scopeWithMode("lines", "HEAD")));
 		expect(lines.mode).toBe("lines");
 		expect(lines.scope).toEqual({ base: "HEAD" });
+		const introduced = buildReport(
+			scopedResultWith(scopeWithMode("introduced", "main")),
+		);
+		expect(introduced.mode).toBe("introduced");
+		expect(introduced.scope).toEqual({ base: "main" });
 
 		const files = buildReport(scopedResultWith(scopeWithMode("files")));
 		expect(files.scope).toBeUndefined();

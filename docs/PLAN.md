@@ -96,6 +96,7 @@ projects[] }`.
 | F027 | Prisma 7 standard generated-client loader ([spec 027](./specs/027-prisma-generated-client-loader/spec.md); separately requested) | 5 | Draft spec |
 | F028 | Interactive console: progress, grouped issue browser, code details, copyable AI context, documentation links, local score and GitHub Actions setup ([spec 028](./specs/028-interactive-console/spec.md)) | 6 | Done |
 | F029 | GitBot fixer: verified fixes with human Git/PR handoff; author-attributed library submission ([spec 029](./specs/029-gitbot-fixer/spec.md), [Library PR #116](https://github.com/gitbot-hq/Library/pull/116)) | 4 | Done |
+| F030 | Introduced findings: compare changed-file diagnostics with their Git baseline ([spec 030](./specs/030-introduced-findings/spec.md)) | 4 | Done |
 
 The empty, unapproved spec 025 GitBot placeholder is superseded by spec 029.
 

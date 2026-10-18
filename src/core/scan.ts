@@ -35,12 +35,16 @@ export interface ScanInput {
 	 * changed.
 	 */
 	scope?: ResolvedScope;
+	/** Internal comparison inputs; never included in a report. */
+	captureAnchors?: boolean;
+	sourceFiles?: string[];
 }
 
 export interface ScanResult {
 	input: ScanInput;
 	diagnostics: Diagnostic[];
 	projects: ProjectInfo[];
+	anchors?: Map<string, string>;
 }
 
 /**
@@ -62,12 +66,14 @@ export async function runScan(
 	};
 	if (onProgress) await progress("Collecting files");
 
-	const collected = collectFiles({
-		target,
-		extensions: SUPPORTED_EXTENSIONS,
-		excludes: DEFAULT_EXCLUDES,
-		ignoreGlobs: input.ignore,
-	});
+	const collected =
+		input.sourceFiles ??
+		collectFiles({
+			target,
+			extensions: SUPPORTED_EXTENSIONS,
+			excludes: DEFAULT_EXCLUDES,
+			ignoreGlobs: input.ignore,
+		});
 	// Spec 015: the scope intersects the collected set. Rules always see
 	// whole files — only the input and output sets are scoped — so a finding
 	// hashes identically in every scope (AC-5).
@@ -196,7 +202,30 @@ export async function runScan(
 
 	const projects: ProjectInfo[] = [project];
 
-	return { input, diagnostics: sortDiagnostics(diagnostics, target), projects };
+	const anchors = input.captureAnchors ? new Map<string, string>() : undefined;
+	if (anchors) {
+		const views = new Map(files.map((file) => [file.filePath, file]));
+		for (const diagnostic of diagnostics) {
+			if (diagnostic.tags.includes("internal")) continue;
+			try {
+				const anchor = views
+					.get(diagnostic.filePath)
+					?.getDiagnosticAnchor?.(diagnostic.line, diagnostic.column);
+				if (anchor) anchors.set(diagnostic.id, anchor);
+			} catch {
+				skippedChecks.push({
+					check: "comparison-anchor",
+					reason: `${relativeTo(target, diagnostic.filePath)}:${diagnostic.line}: cannot derive source anchor`,
+				});
+			}
+		}
+	}
+	return {
+		input,
+		diagnostics: sortDiagnostics(diagnostics, target),
+		projects,
+		...(anchors ? { anchors } : {}),
+	};
 }
 
 /** Target-relative posix path, the form used in ids and report ordering. */
