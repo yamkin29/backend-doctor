@@ -70,6 +70,7 @@ Useful scan flags:
 
 ```sh
 --scope changed        # only files changed in git (vs --base <ref>, default HEAD)
+--scope introduced     # only unmatched findings compared with the Git baseline
 --scope lines          # only diagnostics inside changed hunks
 --scope files --file <path> [--file <path> …]
 --ignore "<glob>"      # exclude files, repeatable
@@ -78,6 +79,42 @@ Useful scan flags:
 --interactive          # require the console; incompatible with CI/JSON/dump-config
 --no-interactive       # print the regular report, including in a terminal
 ```
+
+To focus on problems introduced by your branch:
+
+```sh
+npx backend-doctor-cli@latest scan --scope introduced --base origin/main
+```
+
+This compares file-rule findings in changed files with their versions at the
+merge-base of `origin/main` and `HEAD`. Omit `--base` to compare local work with
+`HEAD`. Staged changes and ordinary non-ignored untracked files are included;
+before the first commit the baseline is empty. `changed` continues to report all
+findings in changed files, including existing debt.
+
+The comparison uses the running analyzer and current effective rule configuration
+for both versions. It matches source anchors rather than position-based IDs, so
+line shifts and matching statement trivia do not turn an old finding into a new
+one. Each old occurrence can match once; additional copies remain visible.
+Git-detected renames preserve the old path correspondence. Untracked moves that
+Git does not detect as renames count as new files. Substantively edited anchors
+are retained when they cannot be matched.
+
+Historical files are read from local Git objects into a temporary snapshot, which
+is removed afterwards. Historical analyzer configuration, application code, hooks,
+and install scripts are not executed. Historical package/TypeScript metadata is
+used without installing historical dependencies. Missing metadata dependencies,
+symlinks, parse errors or failed checks can limit comparison. Inspect
+`projects[].skippedChecks` in JSON (or coverage in the console/text report):
+`baseline-comparison` explains when retained findings are **unverified candidates**,
+not proven new problems. JSONL cannot carry those coverage notices.
+
+Introduced reports use `mode: "introduced"`, `scope.base`, and the existing
+`schemaVersion: 1`. They remain partial scans: project rules are skipped and a local
+score is unavailable. Exit codes still depend on the findings actually reported;
+coverage limitations alone do not change them. Runtime findings supplied with
+`--trace` are merged without Git comparison. Existing generated GitHub workflows
+continue to use changed-line scans.
 
 ## Interactive console
 

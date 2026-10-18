@@ -85,6 +85,11 @@ const FINDINGS: Diagnostic[] = [
 ];
 
 describe("buildSurfaces — comment", () => {
+	it("includes the base ref for introduced reports", () => {
+		const body = buildSurfaces(doc({ mode: "introduced" }), opts()).comment
+			?.body;
+		expect(body).toContain("scope: introduced, base: origin/main");
+	});
 	it("summarizes counts with pluralization and the scope line", () => {
 		const env = buildSurfaces(doc({ diagnostics: FINDINGS }), opts());
 		const body = env.comment?.body ?? "";

@@ -58,14 +58,14 @@ export async function run(argv: string[]): Promise<number> {
 		.addOption(
 			new Option(
 				"--scope <mode>",
-				"restrict the scan: all|changed|files|lines (spec 015)",
+				"restrict the scan: all|changed|files|lines|introduced",
 			)
-				.choices(["all", "changed", "files", "lines"])
+				.choices(["all", "changed", "files", "lines", "introduced"])
 				.default("all"),
 		)
 		.option(
 			"--base <ref>",
-			'git ref for --scope changed|lines (default: "HEAD")',
+			'git ref for --scope changed|lines|introduced (default: "HEAD")',
 		)
 		.option(
 			"--file <path>",

@@ -197,6 +197,33 @@ class TsMorphSourceFileView implements SourceFileView {
 	getText(node?: Node): string {
 		return node ? node.getText() : this.sourceFile.getFullText();
 	}
+
+	getDiagnosticAnchor(line: number, column: number): string | undefined {
+		const source = this.sourceFile.compilerNode;
+		if (line < 1 || column < 1 || line > source.getLineStarts().length)
+			return undefined;
+		const position = source.getPositionOfLineAndCharacter(line - 1, column - 1);
+		let owner: Node | undefined;
+		this.sourceFile.forEachDescendant((node) => {
+			if (node.getStart() > position || node.getEnd() <= position) return;
+			if (
+				ts.isStatement(node.compilerNode) ||
+				ts.isClassElement(node.compilerNode)
+			) {
+				if (!owner || node.getWidth() < owner.getWidth()) owner = node;
+			}
+		});
+		if (!owner) return undefined;
+		const tokens: [number, string][] = [];
+		const visit = (node: ts.Node): void => {
+			// Walk parsed syntax rather than rescanning text: a context-free
+			// scanner mistakes regex character classes for comment trivia.
+			tokens.push([node.kind, ts.isToken(node) ? node.getText(source) : ""]);
+			ts.forEachChild(node, visit);
+		};
+		visit(owner.compilerNode);
+		return JSON.stringify(tokens);
+	}
 }
 
 /** Pattern recognition is only for loud failures; TS decides target precedence. */

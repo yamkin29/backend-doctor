@@ -77,6 +77,19 @@ this file does not track another product's current features or rule counts.
 
 ## Tests and fixtures
 
+- **Baseline identity differs from report identity.** Diagnostic IDs include
+  current source positions. Introduced scans match parser-derived source anchors
+  with one-to-one occurrence consumption and unchanged-line preference instead.
+  Walk parsed syntax for anchors: rescanning text without parser context can
+  mistake regex character classes for comments. See
+  [matching regressions](../tests/unit/scope/introduced.test.ts).
+- **Read baseline Git objects without checking out code.** Historical config is
+  never executed; symlinks are not followed. Canonicalize current paths before
+  deriving snapshot-relative paths, while preserving report spelling. Empty
+  baselines must include indexed files as well as `ls-files --others`. See
+  [introduced scan integration](../tests/integration/introduced-scan.test.ts) and
+  [CLI coverage](../tests/e2e/introduced.test.ts).
+
 - **Never rename or remove shared `dist/` artifacts during tests.** Parallel
   workers spawn the same built CLI/hook. Use temporary missing paths to test
   preflight failures. See [probe tests](../tests/e2e/probe.test.ts).

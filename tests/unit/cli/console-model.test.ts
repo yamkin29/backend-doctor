@@ -117,4 +117,17 @@ describe("console model (spec 028)", () => {
 			"a\\u001b[31mb\\u009bc\\u0000\\u000d\n    x",
 		);
 	});
+	it("shows introduced scope and unverified baseline candidates in coverage", () => {
+		const doc = report({ mode: "introduced" });
+		const project = doc.projects[0];
+		if (!project) throw new Error("Missing fixture project");
+		project.complete = false;
+		project.skippedChecks.push({
+			check: "baseline-comparison",
+			reason: "a.ts: unverified candidates, not proven introduced",
+		});
+		expect(coverageLines(doc).join("\n")).toContain("Scope: introduced");
+		expect(coverageLines(doc).join("\n")).toContain("unverified candidates");
+		expect(scoreReport(doc)).toEqual({ reason: "partial scan scope" });
+	});
 });

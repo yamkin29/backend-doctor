@@ -42,7 +42,7 @@ export interface SkippedCheck {
 
 /**
  * The report's `mode`: `"full"` for the pre-015 whole-tree scan, otherwise
- * the active partial scope (spec 015).
+ * the active partial scope (specs 015/030).
  */
 export type ScanMode = "full" | ScopeMode;
 
@@ -76,7 +76,7 @@ export interface ReportDocument {
 	schemaVersion: typeof REPORT_SCHEMA_VERSION;
 	mode: ScanMode;
 	/**
-	 * Present only for `changed`/`lines` scopes (spec 015): the resolved
+	 * Present for `changed`/`lines`/`introduced` scopes: the resolved
 	 * `--base` the diff was computed against, so a report can be reproduced.
 	 */
 	scope?: { base: string };

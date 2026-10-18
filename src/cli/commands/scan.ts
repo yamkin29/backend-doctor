@@ -15,6 +15,7 @@ import { sortDiagnostics } from "../../engine/runner.js";
 import { getReporter, type ReportFormat } from "../../reporters/index.js";
 import { type LoadedTrace, loadTraceSession } from "../../runtime/load.js";
 import { buildRuntimeDiagnostics } from "../../runtime/merge.js";
+import { compareIntroduced } from "../../scope/baseline.js";
 import { resolveScope } from "../../scope/resolve.js";
 import type { ResolvedScope, ScopeOption } from "../../scope/types.js";
 import type { ConsoleSession } from "../console/session.js";
@@ -153,6 +154,7 @@ export async function scanCommand(
 				ignore: resolved.ignore.files,
 				config: resolved,
 				scope,
+				...(scope?.mode === "introduced" ? { captureAnchors: true } : {}),
 			},
 			session
 				? (stage) => {
@@ -164,6 +166,14 @@ export async function scanCommand(
 					}
 				: undefined,
 		);
+		if (scope?.mode === "introduced") {
+			try {
+				session?.stage("Comparing Git baseline");
+			} catch (error) {
+				presentationFailure(error);
+			}
+			await compareIntroduced(result);
+		}
 		if (trace !== undefined) {
 			// Scope filtering (including `lines`) already ran inside the scan —
 			// runtime diagnostics are merged after it, so they survive every

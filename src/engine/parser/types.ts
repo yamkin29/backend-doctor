@@ -65,6 +65,8 @@ export interface SourceFileView {
 	resolveModuleSpecifier?(specifier: string): ModuleResolution;
 	/** Full source text, or the text of the given node. */
 	getText(node?: Node): string;
+	/** Normalized tokens of the owning statement/declaration for diff matching. */
+	getDiagnosticAnchor?(line: number, column: number): string | undefined;
 }
 
 export interface FileLoadFailure {

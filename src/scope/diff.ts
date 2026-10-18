@@ -20,3 +20,25 @@ export function parseHunks(diffText: string): LineRange[] {
 	}
 	return ranges;
 }
+
+/** Map a current line through a zero-context diff; changed lines have no peer. */
+export function mapUnchangedLine(
+	diffText: string,
+	line: number,
+): number | undefined {
+	let offset = 0;
+	for (const header of diffText.split("\n")) {
+		const match = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(header);
+		if (!match) continue;
+		const oldStart = Number(match[1]);
+		const oldCount = Number(match[2] ?? 1);
+		const newStart = Number(match[3]);
+		const newCount = Number(match[4] ?? 1);
+		if (line < newStart || (newCount === 0 && line === newStart))
+			return line + offset;
+		if (newCount > 0 && line < newStart + newCount) return undefined;
+		offset =
+			oldStart + Math.max(oldCount, 1) - newStart - Math.max(newCount, 1);
+	}
+	return line + offset;
+}

@@ -62,7 +62,7 @@ function relativePath(
 
 function scopeLine(doc: ReportDocument): string {
 	const base =
-		doc.mode === "changed" || doc.mode === "lines"
+		doc.mode === "changed" || doc.mode === "lines" || doc.mode === "introduced"
 			? doc.scope?.base
 			: undefined;
 	const suffix = base ? `, base: ${base}` : "";

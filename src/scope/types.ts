@@ -3,7 +3,7 @@
  * CLI default and never reaches the engine as a scope object; the report
  * spells it `mode: "full"`.
  */
-export type ScopeMode = "changed" | "files" | "lines";
+export type ScopeMode = "changed" | "files" | "lines" | "introduced";
 
 export type ScopeOption = "all" | ScopeMode;
 
@@ -25,8 +25,11 @@ export interface ResolvedScope {
 	files: ReadonlySet<string>;
 	lineRanges: ReadonlyMap<string, readonly LineRange[]>;
 	/**
-	 * The resolved `--base` value; present only for `changed`/`lines`, where
+	 * The resolved `--base` value; present for `changed`/`lines`/`introduced`, where
 	 * the report's `scope.base` field carries it for reproducibility.
 	 */
 	base?: string;
+	/** Internal baseline provenance; never serialized into ordinary reports. */
+	repositoryRoot?: string;
+	baselineCommit?: string;
 }

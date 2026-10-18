@@ -18,6 +18,7 @@ export type GitOutput =
 export async function runGit(
 	cwd: string,
 	args: readonly string[],
+	options?: { acceptDiffExit?: boolean },
 ): Promise<GitOutput> {
 	try {
 		const { stdout } = await execFileAsync("git", [...args], {
@@ -26,7 +27,17 @@ export async function runGit(
 		});
 		return { ok: true, stdout };
 	} catch (error) {
-		const err = error as NodeJS.ErrnoException & { stderr?: string };
+		const err = error as NodeJS.ErrnoException & {
+			stderr?: string;
+			stdout?: string;
+		};
+		if (
+			options?.acceptDiffExit &&
+			String(err.code) === "1" &&
+			typeof err.stdout === "string"
+		) {
+			return { ok: true, stdout: err.stdout };
+		}
 		if (err.code === "ENOENT") return { ok: false, kind: "missing-git" };
 		return {
 			ok: false,
